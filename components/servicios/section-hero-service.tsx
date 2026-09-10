@@ -1,37 +1,59 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import gsap from "gsap";
+import { prefersReducedMotion } from "@/lib/motion";
 
 export default function ServicesHero() {
-    return (
-        <section className="bg-[#f3f4f6] dark:bg-[#0a0e1a] px-6 pb-16 pt-[102px] md:px-[100px] md:pt-[122px]">
-            <div className="mx-auto max-w-[1240px]">
-                <Link
-                    href="/"
-                    className="inline-flex items-center text-[14px] font-medium leading-[20px] text-[#101828] dark:text-white transition-colors hover:text-[#2563eb]"
-                >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Volver al inicio
-                </Link>
+  const ref = useRef<HTMLElement>(null);
 
-                <div className="mt-7 max-w-[976px]">
-                    <div className="group relative mb-7 inline-flex h-[34px] items-center gap-2.5 overflow-hidden rounded-full border border-white/40 bg-gradient-to-r from-[#1ec4ff] via-[#1082ff] to-[#0047ff] px-4 text-[12px] font-semibold uppercase tracking-[0.08em] text-white shadow-[0_4px_18px_-4px_rgba(16,130,255,0.55)] dark:border-white/10 dark:from-[#1ec4ff]/20 dark:via-[#1082ff]/20 dark:to-[#0047ff]/20 dark:text-white dark:shadow-[0_0_25px_-2px_rgba(30,196,255,0.35)] dark:backdrop-blur-md">
-                        <span className="relative flex h-2 w-2 items-center justify-center">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75 dark:bg-[#1ec4ff]" />
-                            <span className="relative inline-flex h-2 w-2 rounded-full bg-white dark:bg-[#1ec4ff]" />
-                        </span>
-                        Catálogo Completo 2026
-                    </div>
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const ctx = gsap.context(() => {
+      const els = ref.current?.querySelectorAll("[data-reveal]");
+      if (!els) return;
+      els.forEach((el, i) => {
+        gsap.set(el, { opacity: 0, y: 18 });
+        gsap.to(el, { opacity: 1, y: 0, duration: 0.7, delay: i * 0.08, ease: "power3.out" });
+      });
+    }, ref);
+    return () => ctx.revert();
+  }, []);
 
-                    <h1 className="mb-6 text-[38px] font-extrabold leading-[1.02] tracking-[-0.03em] text-[#101828] dark:text-white md:text-[51.2px] md:leading-[56.32px] md:tracking-[-1.792px]">
-                        Todos nuestros <span className="text-[#101828] dark:text-white">servicios</span>
-                    </h1>
+  return (
+    <section ref={ref} className="relative overflow-hidden px-6 pb-20 pt-[130px] md:px-[100px]" style={{ background: "#080a0f", color: "#f2f3f5" }}>
+      {/* Subtle radial glow */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(60% 40% at 50% 0%, rgba(30,120,255,0.12), transparent 70%)" }} />
 
-                    <p className="max-w-[560px] text-[14px] leading-[25.2px] text-[#101828] dark:text-[#a1a8b3]">
-                        Desde identidad de marca hasta infraestructura cloud — un ecosistema
-                        completo de soluciones digitales organizadas en 4 fases estratégicas.
-                    </p>
-                </div>
-            </div>
-        </section>
-    );
+      <div className="relative mx-auto max-w-[1200px]">
+        <Link
+          href="/"
+          data-reveal=""
+          className="inline-flex items-center gap-2 text-[13px] font-medium transition-colors hover:text-white"
+          style={{ color: "rgba(242,243,245,0.5)" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8.5 3L4.5 7l4 4" /></svg>
+          Volver al inicio
+        </Link>
+
+        <div data-reveal="" className="mt-8 max-w-[760px]">
+          <p className="flex items-center gap-2.5 text-xs font-medium uppercase tracking-[0.08em]" style={{ color: "rgba(242,243,245,0.55)" }}>
+            <span className="h-1.5 w-1.5 rounded-full bg-[#1ec4ff]" style={{ boxShadow: "0 0 12px #1ec4ff" }} />
+            Catálogo Completo 2026
+          </p>
+
+          <h1 className="mt-5 text-[clamp(36px,5vw,58px)] font-semibold leading-[1.02] tracking-[-0.035em]" style={{ textWrap: "balance" }}>
+            Todos nuestros{" "}
+            <em style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontWeight: 400, color: "#bfe9ff" }}>servicios</em>
+          </h1>
+
+          <p className="mt-5 max-w-[520px] text-[15.5px] font-light leading-[1.6]" style={{ color: "rgba(242,243,245,0.62)" }}>
+            Desde identidad de marca hasta infraestructura cloud — un ecosistema
+            completo de soluciones digitales organizadas en 4 fases estratégicas.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
 }
