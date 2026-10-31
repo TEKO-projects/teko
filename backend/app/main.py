@@ -6,7 +6,8 @@ from fastapi import FastAPI
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.core.cors import setup_cors
-from app.db.session import SessionLocal
+from app.db.schema_guard import ensure_schema
+from app.db.session import SessionLocal, engine
 from app.repositories import mailbox_repository
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(_: FastAPI):
     # El correo de una persona con buzón no debe verse en General. Si había correo viejo
     # marcado como general, se corrige solo al arrancar (no depende de correr la migración).
+    try:
+        ensure_schema(engine)
+    except Exception:  # noqa: BLE001 - un fallo aquí no debe impedir que la API arranque
+        logger.exception("No se pudo verificar el esquema de la base al arrancar")
     try:
         with SessionLocal() as db:
             moved, linked = mailbox_repository.reclassify_general(db, settings.RESEND_FROM_EMAIL)

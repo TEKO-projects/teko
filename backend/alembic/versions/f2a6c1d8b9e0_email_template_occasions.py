@@ -79,13 +79,19 @@ OCCASIONS = [
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.add_column('email_templates', sa.Column('occasion', sa.String(length=40), nullable=True))
-    op.add_column('email_templates', sa.Column('kicker', sa.String(length=80), nullable=True))
-    op.add_column('email_templates', sa.Column('headline', sa.String(length=160), nullable=True))
-    op.add_column('email_templates', sa.Column('button_label', sa.String(length=40), nullable=True))
-    op.add_column('email_templates', sa.Column('button_url', sa.String(length=500), nullable=True))
-    op.add_column('email_templates', sa.Column('signature_style', sa.String(length=12), nullable=False, server_default='texto'))
-    op.add_column('email_templates', sa.Column('signature_card', sa.JSON(), nullable=True))
+    existing = {column['name'] for column in sa.inspect(op.get_bind()).get_columns('email_templates')}
+    new_columns = [
+        sa.Column('occasion', sa.String(length=40), nullable=True),
+        sa.Column('kicker', sa.String(length=80), nullable=True),
+        sa.Column('headline', sa.String(length=160), nullable=True),
+        sa.Column('button_label', sa.String(length=40), nullable=True),
+        sa.Column('button_url', sa.String(length=500), nullable=True),
+        sa.Column('signature_style', sa.String(length=12), nullable=False, server_default='texto'),
+        sa.Column('signature_card', sa.JSON(), nullable=True),
+    ]
+    for column in new_columns:
+        if column.name not in existing:
+            op.add_column('email_templates', column)
 
     templates = sa.table(
         'email_templates',
@@ -96,7 +102,10 @@ def upgrade() -> None:
         sa.column('signature', sa.Text), sa.column('signature_style', sa.String), sa.column('signature_card', sa.JSON),
         sa.column('footer_text', sa.Text), sa.column('social_links', sa.JSON),
     )
-    op.bulk_insert(templates, OCCASIONS)
+    # Solo si aún no hay plantillas por ocasión (así repetir la migración no las duplica).
+    already = op.get_bind().execute(sa.text('SELECT COUNT(*) FROM email_templates WHERE occasion IS NOT NULL')).scalar()
+    if not already:
+        op.bulk_insert(templates, OCCASIONS)
 
 
 def downgrade() -> None:
