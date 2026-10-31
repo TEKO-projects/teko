@@ -168,8 +168,9 @@ def create_mailbox(db: Session, payload: MailboxCreate) -> MailboxRead:
     )
     mailbox = mailbox_repository.save(db, mailbox)
     mailbox_repository.resolve_pending(db, mailbox.planner_user_id, "approved")
+    mailbox_repository.backfill_inbound(db, mailbox)
     notice_sent = send_enabled_notice(db, mailbox)
-    return _read(mailbox, {}).model_copy(update={"notice_sent": notice_sent})
+    return _read(mailbox, mailbox_repository.counts(db)).model_copy(update={"notice_sent": notice_sent})
 
 
 def update_mailbox(db: Session, mailbox_id: int, payload: MailboxUpdate) -> MailboxRead:
@@ -187,6 +188,8 @@ def update_mailbox(db: Session, mailbox_id: int, payload: MailboxUpdate) -> Mail
     mailbox = mailbox_repository.save(db, mailbox)
     if mailbox.is_active:
         mailbox_repository.resolve_pending(db, mailbox.planner_user_id, "approved")
+    if mailbox.is_active and not was_active:
+        mailbox_repository.backfill_inbound(db, mailbox)
     notice_sent = send_enabled_notice(db, mailbox) if mailbox.is_active and not was_active else None
     return _read(mailbox, mailbox_repository.counts(db)).model_copy(update={"notice_sent": notice_sent})
 

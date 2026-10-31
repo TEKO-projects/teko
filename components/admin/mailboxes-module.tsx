@@ -238,7 +238,7 @@ function MailboxRow({ mailbox, onChanged, onCopy }: { mailbox: Mailbox; onChange
         </div>
         <div className="w-full min-w-0 text-[12.5px] text-[rgba(242,243,245,0.5)] sm:w-[240px]">
           <p className="truncate text-[rgba(242,243,245,0.72)]">{mailbox.planner_user_name}</p>
-          <p className="truncate">{mailbox.admin_user_id ? "CMS" : "Planner"} · {mailbox.planner_user_email}</p>
+          <p className="truncate">{mailbox.planner_user_id ? "Planner" : "CMS"} · {mailbox.planner_user_email}</p>
         </div>
         <div className="w-[118px] text-[12.5px] tabular-nums text-[rgba(242,243,245,0.5)]">
           <p><span className="text-[rgba(242,243,245,0.85)]">{mailbox.total_messages}</span> correos</p>
@@ -266,7 +266,7 @@ function MailboxRow({ mailbox, onChanged, onCopy }: { mailbox: Mailbox; onChange
         </div>
       </div>
 
-      {confirmOff && <p className="mt-2 pl-[54px] text-[12px] text-[rgba(242,243,245,0.45)]">{mailbox.admin_user_id ? "Dejará de ver Mi correo en el CMS." : "Dejará de ver su Bandeja en el Planner."} Lo que llegue a esta dirección irá a Correos del CMS.</p>}
+      {confirmOff && <p className="mt-2 pl-[54px] text-[12px] text-[rgba(242,243,245,0.45)]">{mailbox.planner_user_id ? "Dejará de ver su Bandeja en el Planner." : "Dejará de ver Mi correo en el CMS."} Lo que llegue mientras esté deshabilitado se guarda y lo verá al habilitarlo; nadie más lo ve.</p>}
       {error && <p className="mt-2 pl-[54px] text-[12.5px] text-[#f87171]">{error}</p>}
 
       {editing && (

@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { AtSign, BarChart3, BriefcaseBusiness, Check, CircleDollarSign, Copy, Eye, EyeOff, FileQuestion, Fingerprint, FolderKanban, Lock, LogOut, Mail, Menu, MessageSquareText, Search, ShieldCheck, Trash2, Users, Wand2, X } from "lucide-react";
+import { AtSign, BarChart3, BriefcaseBusiness, Check, CircleDollarSign, Copy, Eye, EyeOff, FileQuestion, Fingerprint, FolderKanban, Lock, LogOut, Mail, Menu, MessageSquareText, ScanSearch, Search, ShieldCheck, Trash2, Users, Wand2, X } from "lucide-react";
 import { api, type AdminUser, type ContactRequest, type DashboardStats } from "@/lib/admin-api";
 import { useAdminAuth } from "./auth-provider";
 import { modules } from "./cms-config";
 import { EmailsModule } from "./emails-module";
+import { AuditModule } from "./audit-module";
 import { MailboxesModule } from "./mailboxes-module";
 import { NotificationsBell } from "./notifications-bell";
 import { PasskeysButton } from "./passkeys-button";
@@ -18,6 +19,7 @@ const nav = [
   { key: "contacts", label: "Solicitudes", icon: MessageSquareText },
   { key: "emails", label: "Correos", icon: Mail },
   { key: "mailboxes", label: "Ad. de Correos", icon: AtSign },
+  { key: "audit", label: "Auditoría", icon: ScanSearch },
   { key: "services", label: "Servicios", icon: BriefcaseBusiness },
   { key: "service-categories", label: "Categorias de servicios", icon: FolderKanban },
   { key: "faqs", label: "FAQs", icon: FileQuestion },
@@ -154,7 +156,7 @@ export function AdminShell() {
         </header>
 
         <main className="mx-auto max-w-7xl p-4 lg:p-8">
-          {active === "dashboard" ? <Dashboard /> : active === "contacts" ? <Contacts /> : active === "emails" ? <EmailsModule onUnreadChange={refreshUnread} /> : active === "mailboxes" ? <MailboxesModule key={mailboxesKey} onRequestsChange={refreshRequests} /> : active === "admins" ? <Admins current={user} /> : selectedModule ? <RecordModule config={selectedModule} /> : null}
+          {active === "dashboard" ? <Dashboard /> : active === "contacts" ? <Contacts /> : active === "emails" ? <EmailsModule onUnreadChange={refreshUnread} /> : active === "audit" ? <AuditModule /> : active === "mailboxes" ? <MailboxesModule key={mailboxesKey} onRequestsChange={refreshRequests} /> : active === "admins" ? <Admins current={user} /> : selectedModule ? <RecordModule config={selectedModule} /> : null}
         </main>
       </div>
     </div>

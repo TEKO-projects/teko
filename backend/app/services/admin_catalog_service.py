@@ -108,6 +108,7 @@ def delete_admin(db: Session, admin_id: int, current_admin: AdminUser) -> None:
 
     # Sus correos enviados se conservan; su buzón queda deshabilitado y sin dueño (lo que llegue vuelve a Correos del CMS).
     db.query(EmailMessage).filter(EmailMessage.sent_by_admin_id == admin.id).update({"sent_by_admin_id": None}, synchronize_session=False)
-    db.query(Mailbox).filter(Mailbox.admin_user_id == admin.id).update({"admin_user_id": None, "is_active": False}, synchronize_session=False)
+    db.query(Mailbox).filter(Mailbox.admin_user_id == admin.id, Mailbox.planner_user_id.is_(None)).update({"admin_user_id": None, "is_active": False}, synchronize_session=False)
+    db.query(Mailbox).filter(Mailbox.admin_user_id == admin.id).update({"admin_user_id": None}, synchronize_session=False)
     # Passkeys y avisos leídos se eliminan en cascada.
     _commit(db, lambda: (db.delete(admin), db.commit()))
