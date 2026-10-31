@@ -24,12 +24,12 @@ router = APIRouter(
 
 
 def get_my_mailbox(db: Session = Depends(get_db), current_admin=Depends(get_current_admin)) -> Mailbox:
-    return mailbox_service.admin_mailbox(db, current_admin.id)
+    return mailbox_service.admin_mailbox(db, current_admin)
 
 
 @router.get("", response_model=MyMailbox)
 def summary(db: Session = Depends(get_db), current_admin=Depends(get_current_admin)):
-    return mailbox_service.admin_mailbox_summary(db, current_admin.id)
+    return mailbox_service.admin_mailbox_summary(db, current_admin)
 
 
 @router.get("/messages", response_model=list[EmailMessageListItem])

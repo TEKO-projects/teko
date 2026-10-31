@@ -61,7 +61,7 @@ def get_email(
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
-    return email_service.get_message(db, email_id)
+    return email_service.present_detail(db, email_service.get_message(db, email_id))
 
 
 @router.post("", response_model=EmailMessageDetail, status_code=201)
@@ -70,7 +70,7 @@ def send_email(
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
-    return email_service.send_email(db, current_admin, payload)
+    return email_service.present_detail(db, email_service.send_email(db, current_admin, payload))
 
 
 @router.patch("/{email_id}/read", response_model=EmailMessageDetail)
@@ -80,4 +80,4 @@ def mark_email_read(
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
-    return email_service.mark_read(db, email_id, payload.is_read)
+    return email_service.present_detail(db, email_service.mark_read(db, email_id, payload.is_read))

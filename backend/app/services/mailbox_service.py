@@ -219,23 +219,38 @@ def dismiss_request(db: Session, request_id: int) -> MailboxRequestRead:
 
 # --- Correo del usuario del CMS ----------------------------------------------
 
-def admin_mailbox(db: Session, admin_user_id: int) -> Mailbox:
-    mailbox = mailbox_repository.get_by_admin_user(db, admin_user_id)
+def _admin_own_mailbox(db: Session, admin) -> Mailbox | None:
+    """Buzón del usuario del CMS. Si su cuenta tiene el mismo correo personal que un
+    empleado del Planner con buzón, es el mismo buzón y se enlaza la primera vez."""
+    mailbox = mailbox_repository.get_by_admin_user(db, admin.id)
+    if mailbox:
+        return mailbox
+    candidate = mailbox_repository.get_by_owner_email(db, admin.email)
+    if candidate and candidate.admin_user_id is None:
+        candidate.admin_user_id = admin.id
+        return mailbox_repository.save(db, candidate)
+    return None
+
+
+def admin_mailbox(db: Session, admin) -> Mailbox:
+    mailbox = _admin_own_mailbox(db, admin)
     if not mailbox or not mailbox.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="mailbox_not_enabled")
     return mailbox
 
 
-def admin_mailbox_summary(db: Session, admin_user_id: int) -> MyMailbox:
-    mailbox = mailbox_repository.get_by_admin_user(db, admin_user_id)
+def admin_mailbox_summary(db: Session, admin) -> MyMailbox:
+    general = settings.RESEND_FROM_EMAIL or None
+    mailbox = _admin_own_mailbox(db, admin)
     if not mailbox or not mailbox.is_active:
-        return MyMailbox(enabled=False)
+        return MyMailbox(enabled=False, general_address=general)
     return MyMailbox(
         enabled=True,
         address=mailbox.address,
         display_name=mailbox.display_name,
         signature=mailbox.signature,
         unread=mailbox_repository.count_unread(db, mailbox.id),
+        general_address=general,
     )
 
 

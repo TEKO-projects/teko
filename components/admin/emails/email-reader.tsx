@@ -67,6 +67,9 @@ export function EmailReader({ email, onBack, onReply, onForward, onMarkUnread, o
                 para {email.to_email}
                 {email.cc && <span> · cc {email.cc}</span>}
               </p>
+              {!inbound && email.sent_by_name && (
+                <p className="mt-0.5 text-[12.5px] text-[rgba(242,243,245,0.5)]">enviado por {email.sent_by_name}</p>
+              )}
               {!inbound && (
                 <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium" style={{ color: status.color }}>
                   <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.color }} />
