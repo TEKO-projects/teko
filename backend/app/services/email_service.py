@@ -320,3 +320,33 @@ def mark_read(db: Session, email_id: int, is_read: bool) -> EmailMessage:
 
 def count_unread(db: Session) -> int:
     return email_message_repository.count_unread(db)
+
+
+def describe_stored(db: Session, provider_id: str | None) -> dict:
+    """Cómo quedó guardado y enlazado un correo recibido (para diagnosticar al reenviar un evento)."""
+    from app.models.mailbox import Mailbox, MailboxMessage
+
+    message = email_message_repository.get_by_provider_id(db, provider_id) if provider_id else None
+    if not message:
+        return {"stored": False}
+    recipients = extract_addresses(message.to_email, message.cc, message.bcc)
+    links = (
+        db.query(Mailbox.id, Mailbox.address, MailboxMessage.is_read)
+        .join(MailboxMessage, MailboxMessage.mailbox_id == Mailbox.id)
+        .filter(MailboxMessage.email_message_id == message.id)
+        .all()
+    )
+    owners = db.query(Mailbox).filter(Mailbox.address.in_(recipients)).all() if recipients else []
+    return {
+        "stored": True,
+        "message_id": message.id,
+        "direction": message.direction,
+        "is_general": message.is_general,
+        "to": message.to_email[:120],
+        "linked_to": [{"mailbox_id": i, "address": a, "is_read": r} for i, a, r in links],
+        "mailboxes_with_that_address": [
+            {"id": m.id, "address": m.address, "active": m.is_active, "planner_user_id": m.planner_user_id, "admin_user_id": m.admin_user_id,
+             "inbound_in_list": len(mailbox_repository.list_links(db, m.id, direction="inbound", search=None, limit=200, offset=0))}
+            for m in owners
+        ],
+    }
