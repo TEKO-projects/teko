@@ -3,7 +3,7 @@ import secrets
 from sqlalchemy.orm import Session
 
 from app.models.admin_user import AdminUser
-from app.repositories import admin_user_repository
+from app.repositories import admin_user_repository, mailbox_repository
 from app.security.hashing import hash_password, verify_password
 from app.security.jwt import create_access_token
 from app.services import planner_client
@@ -42,6 +42,16 @@ def login(db: Session, email: str, password: str, remember: bool = False):
     return _login_local(db, email, password, remember)
 
 
+def _link_planner_mailbox(db: Session, admin: AdminUser, planner_user_id: str) -> None:
+    """Quien entra con su cuenta del Planner ve su propio buzón en Correos > Mi correo."""
+    if not planner_user_id or mailbox_repository.get_by_admin_user(db, admin.id):
+        return
+    mailbox = mailbox_repository.get_by_planner_user(db, planner_user_id)
+    if mailbox and mailbox.admin_user_id is None:
+        mailbox.admin_user_id = admin.id
+        mailbox_repository.save(db, mailbox)
+
+
 def _login_via_planner(db: Session, email: str, password: str, remember: bool):
     try:
         result, remote = planner_client.verify_login(email, password)
@@ -67,4 +77,5 @@ def _login_via_planner(db: Session, email: str, password: str, remember: bool):
     elif not admin.is_active:
         return None
 
+    _link_planner_mailbox(db, admin, str(remote.get("id") or ""))
     return issue_token(admin, remember)

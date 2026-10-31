@@ -39,6 +39,13 @@ def get_by_owner_email(db: Session, email: str) -> Mailbox | None:
     return db.query(Mailbox).filter(func.lower(Mailbox.planner_user_email) == email.strip().lower()).first()
 
 
+def by_addresses(db: Session, addresses: set[str]) -> list[Mailbox]:
+    """Buzones dueños de esas direcciones, activos o no: un correo de una persona nunca es de todos."""
+    if not addresses:
+        return []
+    return db.query(Mailbox).filter(Mailbox.address.in_(addresses)).all()
+
+
 def get_by_admin_user(db: Session, admin_user_id: int) -> Mailbox | None:
     return db.query(Mailbox).filter(Mailbox.admin_user_id == admin_user_id).first()
 
@@ -62,6 +69,34 @@ def link_message(db: Session, mailbox_id: int, email_message_id: int, *, is_read
     db.commit()
     db.refresh(link)
     return link
+
+
+def backfill_inbound(db: Session, mailbox: Mailbox) -> int:
+    """Enlaza al buzón el correo recibido en su dirección que aún no tiene (p. ej. mientras estuvo deshabilitado)."""
+    already = db.query(MailboxMessage.email_message_id).filter(MailboxMessage.mailbox_id == mailbox.id)
+    candidates = (
+        db.query(EmailMessage)
+        .filter(
+            EmailMessage.direction == "inbound",
+            EmailMessage.id.notin_(already),
+            or_(
+                EmailMessage.to_email.ilike(f"%{mailbox.address}%"),
+                EmailMessage.cc.ilike(f"%{mailbox.address}%"),
+                EmailMessage.bcc.ilike(f"%{mailbox.address}%"),
+            ),
+        )
+        .all()
+    )
+    linked = 0
+    for message in candidates:
+        if mailbox.address.lower() not in extract_addresses(message.to_email, message.cc, message.bcc):
+            continue
+        db.add(MailboxMessage(mailbox_id=mailbox.id, email_message_id=message.id, is_read=message.is_read))
+        if message.is_general:
+            message.is_general = False
+        linked += 1
+    db.commit()
+    return linked
 
 
 def counts(db: Session) -> dict[int, tuple[int, int]]:

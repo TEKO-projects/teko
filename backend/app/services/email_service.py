@@ -237,14 +237,17 @@ def _store_received_email(db: Session, data: dict) -> str:
     )
 
     recipients = extract_addresses(message.to_email, message.cc, message.bcc)
-    mailboxes = mailbox_repository.active_by_addresses(db, recipients)
+    owners = mailbox_repository.by_addresses(db, recipients)
     general_address = settings.RESEND_FROM_EMAIL.lower()
-    # Va a la bandeja del CMS si iba a la dirección general o a nadie con buzón.
-    message.is_general = not mailboxes or (bool(general_address) and general_address in recipients)
+    # Correos del CMS (General): solo lo dirigido a la dirección general o a una dirección sin dueño.
+    # El correo de una persona con buzón es solo suyo, esté su buzón activo o no: si está
+    # deshabilitado se guarda y le llega al habilitarlo.
+    message.is_general = not owners or (bool(general_address) and general_address in recipients)
 
     email_message_repository.create(db, message)
-    for mailbox in mailboxes:
-        mailbox_repository.link_message(db, mailbox.id, message.id, is_read=False)
+    for mailbox in owners:
+        if mailbox.is_active:
+            mailbox_repository.link_message(db, mailbox.id, message.id, is_read=False)
     return "received"
 
 
