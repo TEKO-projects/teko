@@ -337,7 +337,13 @@ def describe_stored(db: Session, provider_id: str | None) -> dict:
         .all()
     )
     owners = db.query(Mailbox).filter(Mailbox.address.in_(recipients)).all() if recipients else []
+    from sqlalchemy import text as sql_text
+
+    mailboxes = db.query(Mailbox.id, Mailbox.address, Mailbox.is_active).order_by(Mailbox.id).limit(40).all()
     return {
+        "database": db.execute(sql_text("select current_database()")).scalar() if db.bind.dialect.name == "postgresql" else db.bind.dialect.name,
+        "emails_in_db": db.query(EmailMessage).count(),
+        "all_mailboxes": [f"{i}:{a!r}{'' if act else ' (inactivo)'}" for i, a, act in mailboxes],
         "stored": True,
         "message_id": message.id,
         "direction": message.direction,
