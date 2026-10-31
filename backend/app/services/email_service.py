@@ -204,8 +204,7 @@ def handle_webhook_event(db: Session, event: dict) -> str:
 def _store_received_email(db: Session, data: dict) -> str:
     provider_id = data.get("email_id") or data.get("id")
 
-    # Solo cuenta como duplicado otro correo recibido: un enviado nunca debe tapar a uno entrante.
-    if provider_id and email_message_repository.get_inbound_by_provider_id(db, provider_id):
+    if provider_id and email_message_repository.get_by_provider_id(db, provider_id):
         return "duplicate"
 
     content: dict = {}
