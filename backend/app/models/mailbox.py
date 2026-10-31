@@ -1,13 +1,18 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
 class Mailbox(Base):
-    """Dirección de correo de un empleado del Planner (p. ej. john.marte@teko.do)."""
+    """Dirección de correo institucional (p. ej. john.marte@teko.do).
+
+Pertenece a un empleado del Planner (planner_user_id) o a un usuario del CMS
+(admin_user_id); siempre uno de los dos. planner_user_name/email guardan el
+nombre y el correo personal de quien la recibe, sea de donde sea.
+"""
 
     __tablename__ = "mailboxes"
 
@@ -17,7 +22,8 @@ class Mailbox(Base):
     signature: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    planner_user_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    planner_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    admin_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True, unique=True, index=True)
     planner_user_name: Mapped[str] = mapped_column(String(200), nullable=False)
     planner_user_email: Mapped[str] = mapped_column(String(320), nullable=False)
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Copy, Hand, LoaderCircle, Pencil, Plus, Search, X } from "lucide-react";
-import { api, type Mailbox, type MailboxRequest, type PlannerUser } from "@/lib/admin-api";
+import { api, type CmsUser, type Mailbox, type MailboxRequest, type PlannerUser } from "@/lib/admin-api";
 import { Avatar, Serif, formatListTime } from "./emails/email-ui";
 
 const inputClass = "h-10 w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 text-[14px] text-[#f2f3f5] outline-none transition-colors placeholder:text-[rgba(242,243,245,0.3)] focus:border-[rgba(30,196,255,0.5)]";
@@ -16,43 +16,71 @@ function defaultSignature(user: PlannerUser) {
   return [user.name, user.job_title ? `${user.job_title} · TEKO` : "TEKO"].join("\n");
 }
 
+type Source = "planner" | "cms";
+
+/** Una persona a la que se le puede dar correo, venga del Planner o del CMS. */
+type Candidate = { source: Source; id: string; name: string; email: string; hint: string; taken: string | null; signature: string };
+
+const SOURCES: Array<{ key: Source; label: string }> = [
+  { key: "planner", label: "Empleado del Planner" },
+  { key: "cms", label: "Usuario del CMS" },
+];
+
+const fromPlanner = (user: PlannerUser): Candidate => ({ source: "planner", id: user.id, name: user.name, email: user.email, hint: user.job_title || user.email, taken: user.mailbox_address, signature: defaultSignature(user) });
+const fromCms = (user: CmsUser): Candidate => ({ source: "cms", id: String(user.id), name: user.name, email: user.email, hint: user.email, taken: user.mailbox_address, signature: `${user.name}\nTEKO` });
+
 function Label({ children }: { children: React.ReactNode }) {
   return <span className="mb-1.5 block text-[12.5px] font-medium text-[rgba(242,243,245,0.72)]">{children}</span>;
 }
 
 function CreatePanel({ domain, preselectId, onClose, onCreated }: { domain: string; preselectId?: string | null; onClose: () => void; onCreated: (mailbox: Mailbox) => void }) {
-  const [users, setUsers] = useState<PlannerUser[] | null>(null);
-  const [usersError, setUsersError] = useState("");
+  const [source, setSource] = useState<Source>("planner");
+  const [lists, setLists] = useState<Partial<Record<Source, Candidate[]>>>({});
+  const [listErrors, setListErrors] = useState<Partial<Record<Source, string>>>({});
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<PlannerUser | null>(null);
+  const [selected, setSelected] = useState<Candidate | null>(null);
   const [localPart, setLocalPart] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [signature, setSignature] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const choose = (user: PlannerUser) => {
-    setSelected(user);
-    setLocalPart(suggestLocalPart(user.name));
-    setDisplayName(user.name);
-    setSignature(defaultSignature(user));
+  const choose = (person: Candidate) => {
+    setSelected(person);
+    setLocalPart(suggestLocalPart(person.name));
+    setDisplayName(person.name);
+    setSignature(person.signature);
+    setError("");
+  };
+
+  const changeSource = (next: Source) => {
+    if (next === source) return;
+    setSource(next);
+    setSelected(null);
+    setQuery("");
     setError("");
   };
 
   useEffect(() => {
     api<PlannerUser[]>("/admin/mailboxes/planner-users")
       .then((list) => {
-        setUsers(list);
+        const people = list.map(fromPlanner);
+        setLists((current) => ({ ...current, planner: people }));
         // Desde una solicitud: el empleado ya viene elegido.
-        const requested = preselectId ? list.find((user) => user.id === preselectId && !user.mailbox_address) : null;
+        const requested = preselectId ? people.find((person) => person.id === preselectId && !person.taken) : null;
         if (requested) choose(requested);
       })
-      .catch((e: Error) => setUsersError(e.message));
+      .catch((e: Error) => setListErrors((current) => ({ ...current, planner: e.message })));
+    api<CmsUser[]>("/admin/mailboxes/cms-users")
+      .then((list) => setLists((current) => ({ ...current, cms: list.map(fromCms) })))
+      .catch((e: Error) => setListErrors((current) => ({ ...current, cms: e.message })));
   }, [preselectId]);
 
+  const users = lists[source] ?? null;
+  const usersError = listErrors[source] ?? "";
   const visible = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return (users ?? []).filter((user) => !term || `${user.name} ${user.email} ${user.job_title ?? ""}`.toLowerCase().includes(term));
+    return (users ?? []).filter((person) => !term || `${person.name} ${person.email} ${person.hint}`.toLowerCase().includes(term));
   }, [users, query]);
 
   const validLocal = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(localPart);
@@ -65,7 +93,7 @@ function CreatePanel({ domain, preselectId, onClose, onCreated }: { domain: stri
     try {
       const mailbox = await api<Mailbox>("/admin/mailboxes", {
         method: "POST",
-        body: JSON.stringify({ planner_user_id: selected.id, local_part: localPart, display_name: displayName.trim(), signature: signature.trim() || null }),
+        body: JSON.stringify({ ...(selected.source === "planner" ? { planner_user_id: selected.id } : { admin_user_id: Number(selected.id) }), local_part: localPart, display_name: displayName.trim(), signature: signature.trim() || null }),
       });
       onCreated(mailbox);
     } catch (e) {
@@ -79,15 +107,25 @@ function CreatePanel({ domain, preselectId, onClose, onCreated }: { domain: stri
     <section aria-label="Nuevo correo" className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1017] motion-safe:animate-[tk-compose-in_220ms_cubic-bezier(0.23,1,0.32,1)]">
       <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
         <div>
-          <h2 className="text-[16px] font-semibold tracking-[-0.01em]">Nuevo correo de empleado</h2>
-          <p className="mt-0.5 text-[12.5px] text-[rgba(242,243,245,0.5)]">Elige a la persona en el Planner y su dirección. Lo verá en su Bandeja al instante.</p>
+          <h2 className="text-[16px] font-semibold tracking-[-0.01em]">Nuevo correo institucional</h2>
+          <p className="mt-0.5 text-[12.5px] text-[rgba(242,243,245,0.5)]">
+            {source === "planner" ? "Elige a la persona en el Planner y su dirección. La verá en su Bandeja al instante." : "Elige al usuario del CMS y su dirección. Lo verá en Correos, en la pestaña Mi correo."}
+          </p>
         </div>
         <button type="button" onClick={onClose} aria-label="Cerrar" className="grid h-8 w-8 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] hover:bg-white/[0.06] hover:text-[#f2f3f5]"><X size={16} /></button>
       </div>
 
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="border-white/[0.06] p-5 lg:border-r">
-          <Label>1. Empleado del Planner</Label>
+          <Label>1. Persona</Label>
+          <div role="tablist" aria-label="Origen" className="mb-3 flex rounded-lg bg-white/[0.04] p-0.5">
+            {SOURCES.map((item) => (
+              <button key={item.key} role="tab" aria-selected={source === item.key} type="button" onClick={() => changeSource(item.key)}
+                className={`flex-1 rounded-md py-1.5 text-[12.5px] font-medium transition-colors ${source === item.key ? "bg-white/[0.09] text-[#f2f3f5]" : "text-[rgba(242,243,245,0.55)] hover:text-[#f2f3f5]"}`}>
+                {item.label}
+              </button>
+            ))}
+          </div>
           <label className="mb-2 flex h-10 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 focus-within:border-[rgba(30,196,255,0.5)]">
             <Search size={15} className="text-[rgba(242,243,245,0.35)]" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nombre o correo" className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[rgba(242,243,245,0.3)]" />
@@ -98,10 +136,10 @@ function CreatePanel({ domain, preselectId, onClose, onCreated }: { domain: stri
             ) : users === null ? (
               [1, 2, 3].map((key) => <div key={key} className="h-12 animate-pulse rounded-lg bg-white/[0.04]" />)
             ) : visible.length === 0 ? (
-              <p className="p-4 text-center text-[13px] text-[rgba(242,243,245,0.45)]">No hay empleados con ese nombre.</p>
+              <p className="p-4 text-center text-[13px] text-[rgba(242,243,245,0.45)]">{query ? "Nadie coincide con esa búsqueda." : source === "cms" ? "No hay usuarios activos en el CMS." : "No hay empleados en el Planner."}</p>
             ) : (
               visible.map((user) => {
-                const taken = Boolean(user.mailbox_address);
+                const taken = Boolean(user.taken);
                 const active = selected?.id === user.id;
                 return (
                   <button
@@ -114,7 +152,7 @@ function CreatePanel({ domain, preselectId, onClose, onCreated }: { domain: stri
                     <Avatar label={user.name} size={30} highlight={active} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px] font-medium">{user.name}</span>
-                      <span className="block truncate text-[12px] text-[rgba(242,243,245,0.45)]">{taken ? `Ya tiene ${user.mailbox_address}` : user.job_title || user.email}</span>
+                      <span className="block truncate text-[12px] text-[rgba(242,243,245,0.45)]">{taken ? `Ya tiene ${user.taken}` : user.hint}</span>
                     </span>
                     {active && <Check size={16} className="shrink-0 text-[#1ec4ff]" />}
                   </button>
@@ -127,7 +165,7 @@ function CreatePanel({ domain, preselectId, onClose, onCreated }: { domain: stri
         <div className="p-5">
           {!selected ? (
             <div className="grid h-full min-h-[220px] place-items-center text-center">
-              <p className="max-w-[28ch] text-[13px] leading-relaxed text-[rgba(242,243,245,0.45)]">Selecciona un empleado para configurar su dirección, nombre y firma.</p>
+              <p className="max-w-[28ch] text-[13px] leading-relaxed text-[rgba(242,243,245,0.45)]">Selecciona a una persona para configurar su dirección, nombre y firma.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -146,7 +184,7 @@ function CreatePanel({ domain, preselectId, onClose, onCreated }: { domain: stri
               <label className="block">
                 <Label>Firma</Label>
                 <textarea rows={3} value={signature} onChange={(e) => setSignature(e.target.value)} className={`${inputClass} h-auto py-2 leading-relaxed`} />
-                <span className="mt-1 block text-[11.5px] text-[rgba(242,243,245,0.4)]">Reemplaza la firma de la plantilla en sus correos. El empleado también puede cambiarla.</span>
+                <span className="mt-1 block text-[11.5px] text-[rgba(242,243,245,0.4)]">Reemplaza la firma de la plantilla en sus correos. La persona también puede cambiarla.</span>
               </label>
               {error && <p role="alert" className="rounded-lg bg-[rgba(248,113,113,0.12)] px-3 py-2 text-[13px] text-[#f87171]">{error}</p>}
               <div className="flex items-center justify-between gap-3 pt-1">
@@ -200,7 +238,7 @@ function MailboxRow({ mailbox, onChanged, onCopy }: { mailbox: Mailbox; onChange
         </div>
         <div className="w-full min-w-0 text-[12.5px] text-[rgba(242,243,245,0.5)] sm:w-[240px]">
           <p className="truncate text-[rgba(242,243,245,0.72)]">{mailbox.planner_user_name}</p>
-          <p className="truncate">Planner · {mailbox.planner_user_email}</p>
+          <p className="truncate">{mailbox.admin_user_id ? "CMS" : "Planner"} · {mailbox.planner_user_email}</p>
         </div>
         <div className="w-[118px] text-[12.5px] tabular-nums text-[rgba(242,243,245,0.5)]">
           <p><span className="text-[rgba(242,243,245,0.85)]">{mailbox.total_messages}</span> correos</p>
@@ -228,7 +266,7 @@ function MailboxRow({ mailbox, onChanged, onCopy }: { mailbox: Mailbox; onChange
         </div>
       </div>
 
-      {confirmOff && <p className="mt-2 pl-[54px] text-[12px] text-[rgba(242,243,245,0.45)]">Dejará de ver su Bandeja en el Planner. Lo que llegue a esta dirección irá a Correos del CMS.</p>}
+      {confirmOff && <p className="mt-2 pl-[54px] text-[12px] text-[rgba(242,243,245,0.45)]">{mailbox.admin_user_id ? "Dejará de ver Mi correo en el CMS." : "Dejará de ver su Bandeja en el Planner."} Lo que llegue a esta dirección irá a Correos del CMS.</p>}
       {error && <p className="mt-2 pl-[54px] text-[12.5px] text-[#f87171]">{error}</p>}
 
       {editing && (
@@ -368,7 +406,7 @@ export function MailboxesModule({ onRequestsChange }: { onRequestsChange?: () =>
           <p className="text-sm font-medium text-[#1ec4ff]">Correo del equipo</p>
           <h1 className="text-2xl font-bold">Administración de correos</h1>
           <p className="mt-1 max-w-[62ch] text-sm text-[rgba(242,243,245,0.5)]">
-            Crea direcciones @{domain || "tu dominio"} para los empleados del Planner. Cada uno lee y responde su correo en su Bandeja; desde aquí solo se administra.
+            Crea direcciones @{domain || "tu dominio"} para empleados del Planner y usuarios del CMS. Los empleados leen y responden en su Bandeja del Planner; los usuarios del CMS, en Correos. Desde aquí solo se administra.
           </p>
         </div>
         {!creating && (
@@ -418,7 +456,7 @@ export function MailboxesModule({ onRequestsChange }: { onRequestsChange?: () =>
         ) : mailboxes.length === 0 ? (
           <div className="px-6 py-16 text-center">
             <p className="text-[18px] font-semibold tracking-[-0.01em]">El equipo aún no tiene <Serif>correo</Serif></p>
-            <p className="mx-auto mt-2 max-w-[44ch] text-[13px] leading-relaxed text-[rgba(242,243,245,0.45)]">Crea el primero con Nuevo correo. La persona lo verá en la Bandeja del Planner con su cuenta de siempre.</p>
+            <p className="mx-auto mt-2 max-w-[44ch] text-[13px] leading-relaxed text-[rgba(242,243,245,0.45)]">Crea el primero con Nuevo correo. Un empleado lo verá en la Bandeja del Planner y un usuario del CMS, en Correos.</p>
           </div>
         ) : (
           <div className="divide-y divide-white/[0.06]">

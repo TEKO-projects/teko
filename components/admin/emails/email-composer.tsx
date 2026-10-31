@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Bold, Italic, List, LoaderCircle, Send, Trash2, X } from "lucide-react";
 import { api, type EmailMessageDetail, type EmailTemplate } from "@/lib/admin-api";
-import { EMAIL_PATTERN, EmailFrame } from "./email-ui";
+import { EMAIL_PATTERN, EmailFrame, mailPaths, type MailBox } from "./email-ui";
 
 export type ComposeMode = "new" | "reply" | "forward";
 
@@ -83,7 +83,7 @@ function RecipientField({ label, values, onChange, autoFocus, trailing }: { labe
   );
 }
 
-export function EmailComposer({ draft, onChange, onClose, onDiscard, onSent, templates, variant = "pane" }: {
+export function EmailComposer({ draft, onChange, onClose, onDiscard, onSent, templates, variant = "pane", box = "general" }: {
   draft: ComposeDraft;
   onChange: (draft: ComposeDraft) => void;
   onClose: () => void;
@@ -91,7 +91,9 @@ export function EmailComposer({ draft, onChange, onClose, onDiscard, onSent, tem
   onSent: (message: EmailMessageDetail) => void;
   templates: EmailTemplate[];
   variant?: "pane" | "inline";
+  box?: MailBox;
 }) {
+  const paths = mailPaths(box);
   const [tab, setTab] = useState<"write" | "preview">("write");
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewError, setPreviewError] = useState("");
@@ -110,7 +112,7 @@ export function EmailComposer({ draft, onChange, onClose, onDiscard, onSent, tem
   useEffect(() => {
     if (tab !== "preview") return;
     const timer = window.setTimeout(() => {
-      api<{ html: string }>("/admin/emails/preview", {
+      api<{ html: string }>(paths.preview, {
         method: "POST",
         body: JSON.stringify({ subject: draft.subject, body: draft.body || " ", template_id: draft.templateId }),
       })
@@ -118,7 +120,7 @@ export function EmailComposer({ draft, onChange, onClose, onDiscard, onSent, tem
         .catch((e: Error) => setPreviewError(e.message));
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [tab, draft.body, draft.subject, draft.templateId]);
+  }, [tab, draft.body, draft.subject, draft.templateId, paths.preview]);
 
   const send = async () => {
     if (sending) return;
@@ -128,7 +130,7 @@ export function EmailComposer({ draft, onChange, onClose, onDiscard, onSent, tem
     setSending(true);
     setError("");
     try {
-      const sent = await api<EmailMessageDetail>("/admin/emails", {
+      const sent = await api<EmailMessageDetail>(paths.send, {
         method: "POST",
         body: JSON.stringify({
           to: draft.to,

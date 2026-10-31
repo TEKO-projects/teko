@@ -34,6 +34,15 @@ def get_by_planner_user(db: Session, planner_user_id: str) -> Mailbox | None:
     return db.query(Mailbox).filter(Mailbox.planner_user_id == planner_user_id).first()
 
 
+def get_by_owner_email(db: Session, email: str) -> Mailbox | None:
+    """Buzón de quien tenga ese correo personal, sea empleado del Planner o usuario del CMS."""
+    return db.query(Mailbox).filter(func.lower(Mailbox.planner_user_email) == email.strip().lower()).first()
+
+
+def get_by_admin_user(db: Session, admin_user_id: int) -> Mailbox | None:
+    return db.query(Mailbox).filter(Mailbox.admin_user_id == admin_user_id).first()
+
+
 def active_by_addresses(db: Session, addresses: set[str]) -> list[Mailbox]:
     if not addresses:
         return []
@@ -150,7 +159,9 @@ def get_request(db: Session, request_id: int) -> MailboxRequest | None:
     return db.query(MailboxRequest).filter(MailboxRequest.id == request_id).first()
 
 
-def resolve_pending(db: Session, planner_user_id: str, status: str) -> None:
+def resolve_pending(db: Session, planner_user_id: str | None, status: str) -> None:
+    if not planner_user_id:
+        return
     db.query(MailboxRequest).filter(
         MailboxRequest.planner_user_id == planner_user_id,
         MailboxRequest.status == "pending",
