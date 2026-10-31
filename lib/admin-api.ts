@@ -75,7 +75,7 @@ export async function finishLogin(accessToken: string, remember: boolean) {
 export interface AdminUser { id: number; email: string; full_name: string; role: string; is_active: boolean }
 export interface DashboardStats { contact_requests: number; new_requests: number; qualified_requests: number; active_services: number; active_projects: number; active_faqs: number; active_plans: number }
 export interface ContactRequest { id: number; name: string; email: string; company: string | null; phone: string | null; service: string | null; budget: string | null; message: string; status: string; created_at: string }
-export interface EmailMessage { id: number; direction: "inbound" | "outbound"; from_email: string; to_email: string; subject: string | null; snippet: string; status: string; is_read: boolean; has_attachments: boolean; created_at: string }
+export interface EmailMessage { id: number; direction: "inbound" | "outbound"; from_email: string; to_email: string; subject: string | null; snippet: string; status: string; is_read: boolean; has_attachments: boolean; created_at: string; sent_by_name?: string | null }
 export interface EmailMessageDetail extends EmailMessage { cc: string | null; bcc: string | null; reply_to: string | null; text_body: string | null; html_body: string | null; message_id: string | null; provider_id: string | null; error_message: string | null; updated_at: string }
 export interface SocialLink { label: string; url: string }
 export type SignatureStyle = "texto" | "completa" | "oscura" | "compacta";
@@ -86,7 +86,7 @@ export interface Mailbox { id: number; address: string; display_name: string; si
 export interface AuditEmail extends EmailMessage { owners: string[]; scope: "general" | "personal" | "unassigned" }
 export interface AuditEmailDetail extends EmailMessageDetail { owners: string[]; scope: "general" | "personal" | "unassigned" }
 export interface CmsUser { id: number; name: string; email: string; role: string; mailbox_address: string | null }
-export interface MyMailbox { enabled: boolean; address: string | null; display_name: string | null; signature: string | null; unread: number }
+export interface MyMailbox { enabled: boolean; address: string | null; display_name: string | null; signature: string | null; unread: number; general_address?: string | null }
 export interface PlannerUser { id: string; name: string; email: string; role: string; job_title: string | null; mailbox_address: string | null }
 export interface MailboxRequest { id: number; planner_user_id: string; planner_user_name: string; planner_user_email: string; status: "pending" | "approved" | "dismissed"; created_at: string; resolved_at: string | null; mailbox_id: number | null; mailbox_address: string | null }
 export interface AdminNotification { id: number; kind: string; title: string; body: string | null; module: string | null; ref_id: number | null; created_at: string; is_read: boolean }

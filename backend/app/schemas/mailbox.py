@@ -83,6 +83,8 @@ class MyMailbox(BaseModel):
     display_name: str | None = None
     signature: str | None = None
     unread: int = 0
+    # Dirección compartida de la bandeja General, para rotular las pestañas.
+    general_address: str | None = None
 
 
 class OwnMailboxUpdate(BaseModel):

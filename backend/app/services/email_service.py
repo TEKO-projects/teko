@@ -4,10 +4,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.models.admin_user import AdminUser
 from app.models.email_message import EmailMessage
 from app.repositories import email_message_repository, email_template_repository, mailbox_repository
 from app.repositories.mailbox_repository import extract_addresses
-from app.schemas.email_message import EmailPreviewRequest, EmailSendRequest
+from app.schemas.email_message import EmailMessageDetail, EmailMessageListItem, EmailPreviewRequest, EmailSendRequest
 from app.services.email_renderer import render_email
 from app.services import resend_client
 from app.services.resend_client import ResendError
@@ -251,15 +252,38 @@ def _store_received_email(db: Session, data: dict) -> str:
     return "received"
 
 
+def _sender_names(db: Session, messages: list[EmailMessage]) -> dict[int, str]:
+    ids = {message.sent_by_admin_id for message in messages if message.sent_by_admin_id}
+    if not ids:
+        return {}
+    return {admin.id: admin.full_name for admin in db.query(AdminUser).filter(AdminUser.id.in_(ids)).all()}
+
+
+def _sent_by(message: EmailMessage, names: dict[int, str]) -> str | None:
+    if message.direction != "outbound":
+        return None
+    return names.get(message.sent_by_admin_id) or "Sistema"
+
+
+def present_list(db: Session, messages: list[EmailMessage]) -> list[EmailMessageListItem]:
+    names = _sender_names(db, messages)
+    return [EmailMessageListItem.model_validate(m).model_copy(update={"sent_by_name": _sent_by(m, names)}) for m in messages]
+
+
+def present_detail(db: Session, message: EmailMessage) -> EmailMessageDetail:
+    names = _sender_names(db, [message])
+    return EmailMessageDetail.model_validate(message).model_copy(update={"sent_by_name": _sent_by(message, names)})
+
+
 def list_messages(db: Session, *, direction: str | None, search: str | None, limit: int, offset: int):
-    return email_message_repository.list_messages(
+    return present_list(db, email_message_repository.list_messages(
         db,
         general_only=True,
         direction=direction,
         search=search,
         limit=limit,
         offset=offset,
-    )
+    ))
 
 
 def get_message(db: Session, email_id: int) -> EmailMessage:

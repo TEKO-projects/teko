@@ -35,6 +35,8 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
   const [folder, setFolder] = useState<Folder>("inbound");
   const [box, setBox] = useState<MailBox>("general");
   const [mine, setMine] = useState<MyMailbox | null>(null);
+  const [mineLoaded, setMineLoaded] = useState(false);
+  const boxChosen = useRef(false);
   const [items, setItems] = useState<EmailMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,7 +65,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
   }, [toast]);
 
   const loadList = useCallback(async (mode: "initial" | "silent" | "more" = "initial", count = PAGE_SIZE) => {
-    if (folder === "templates") return;
+    if (folder === "templates" || !mineLoaded) return;
     if (mode === "silent") setRefreshing(true);
     try {
       const offset = mode === "more" ? count : 0;
@@ -77,7 +79,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
       setLoading(false);
       setRefreshing(false);
     }
-  }, [folder, notify, paths]);
+  }, [folder, notify, paths, mineLoaded]);
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -95,9 +97,11 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
   const loadMine = useCallback(() => {
     api<MyMailbox>("/admin/my-mailbox").then((summary) => {
       setMine(summary);
+      // Quien tiene correo propio abre en su bandeja personal; General queda a un clic.
+      if (summary.enabled && !boxChosen.current) { boxChosen.current = true; setBox("mine"); }
       // Si le deshabilitaron el correo mientras lo veía, vuelve al general.
       if (!summary.enabled) setBox("general");
-    }).catch(() => undefined);
+    }).catch(() => undefined).finally(() => setMineLoaded(true));
   }, []);
   useEffect(() => { Promise.resolve().then(loadMine); }, [loadMine]);
 
@@ -134,6 +138,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
   };
 
   const changeBox = (next: MailBox) => {
+    boxChosen.current = true;
     if (next === box) return;
     setBox(next);
     setSearch("");
@@ -284,8 +289,17 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
   const detailOpen = folder === "templates" ? selectedTemplate !== null : view === "composer" || selectedId !== null;
   const canContinueDraft = Boolean(draft && draft.mode !== "reply" && draftHasContent(draft));
 
-  const boxSwitch = mine?.enabled ? (
-    <div role="tablist" aria-label="Buzón" className="flex rounded-lg bg-white/[0.04] p-0.5">
+  const boxCaption = mine ? (
+    <p className="min-w-0 px-0.5 text-[11.5px] leading-snug text-[rgba(242,243,245,0.45)]">
+      {box === "mine"
+        ? <><span className="text-[rgba(242,243,245,0.75)]">{mine.address}</span> · solo tú</>
+        : <><span className="text-[rgba(242,243,245,0.75)]">{mine.general_address ?? "Dirección general"}</span> · compartida con todos los administradores</>}
+    </p>
+  ) : null;
+
+  const boxSwitch = mine ? (
+    <div className="space-y-1.5">
+    {mine.enabled && <div role="tablist" aria-label="Buzón" className="flex rounded-lg bg-white/[0.04] p-0.5">
       {([["general", "General", null], ["mine", "Mi correo", mine.unread]] as const).map(([key, label, count]) => (
         <button key={key} role="tab" aria-selected={box === key} type="button" onClick={() => changeBox(key)} title={key === "mine" ? mine.address ?? undefined : undefined}
           className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[12.5px] font-medium transition-colors ${box === key ? "bg-white/[0.09] text-[#f2f3f5]" : "text-[rgba(242,243,245,0.55)] hover:text-[#f2f3f5]"}`}>
@@ -293,6 +307,8 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
           {count ? <span className="text-[11px] font-semibold text-[#1ec4ff]">{count}</span> : null}
         </button>
       ))}
+    </div>}
+    {boxCaption}
     </div>
   ) : null;
 

@@ -47,6 +47,7 @@ function Row({ item, selected, onSelect }: { item: EmailMessage; selected: boole
         </span>
         <span className="mt-0.5 flex items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-[12.5px] text-[rgba(242,243,245,0.4)]">{item.snippet || "Sin vista previa"}</span>
+          {!inbound && item.sent_by_name && <span className="shrink-0 text-[11.5px] text-[rgba(242,243,245,0.4)]">por {item.sent_by_name}</span>}
           {!inbound && (
             <span className="inline-flex shrink-0 items-center gap-1 text-[11.5px] font-medium" style={{ color: failed ? "#f87171" : "rgba(242,243,245,0.45)" }}>
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.color }} />

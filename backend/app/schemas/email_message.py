@@ -16,6 +16,8 @@ class EmailMessageListItem(BaseModel):
     is_read: bool
     has_attachments: bool
     created_at: datetime
+    # Solo en la bandeja general: quién mandó el correo (un administrador, o "Sistema" si salió solo).
+    sent_by_name: str | None = None
 
     model_config = {"from_attributes": True}
 
