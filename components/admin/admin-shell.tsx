@@ -2,16 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { AtSign, BarChart3, BriefcaseBusiness, Check, CircleDollarSign, Copy, Eye, EyeOff, FileQuestion, Fingerprint, FolderKanban, Lock, LogOut, Mail, Menu, MessageSquareText, ScanSearch, Search, ShieldCheck, Trash2, Users, Wand2, X } from "lucide-react";
+import { AtSign, BarChart3, BriefcaseBusiness, CircleDollarSign, Eye, EyeOff, FileQuestion, Fingerprint, FolderKanban, Lock, LogOut, Mail, Menu, MessageSquareText, KeyRound, ScanSearch, Search, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import { api, type AdminUser, type ContactRequest, type DashboardStats } from "@/lib/admin-api";
 import { useAdminAuth } from "./auth-provider";
 import { modules } from "./cms-config";
 import { EmailsModule } from "./emails-module";
 import { AuditModule } from "./audit-module";
 import { MailboxesModule } from "./mailboxes-module";
+import { PasswordFields, passwordsMismatch, type PasswordPair } from "./password-fields";
 import { NotificationsBell } from "./notifications-bell";
 import { PasskeysButton } from "./passkeys-button";
-import { isCancelled, usePasskeysSupported } from "@/lib/passkeys";
+import { changePasswordWithPasskey, isCancelled, usePasskeysSupported } from "@/lib/passkeys";
 import { RecordModule } from "./record-module";
 
 const nav = [
@@ -166,6 +167,85 @@ export function AdminShell() {
 // Entradas del login: borde y anillo de foco con clases, para que se vean igual con teclado, ratón y autocompletado.
 const loginInput = "h-12 w-full rounded-xl border border-white/10 bg-white/[0.04] text-[15px] text-[#f2f3f5] outline-none transition-[border-color,box-shadow] placeholder:text-[rgba(242,243,245,0.3)] hover:border-white/20 focus:border-[rgba(30,196,255,0.6)] focus:bg-white/[0.06] disabled:opacity-60 aria-[invalid=true]:border-[rgba(248,113,113,0.5)] [&:-webkit-autofill]:[-webkit-text-fill-color:#f2f3f5] [&:-webkit-autofill]:shadow-[inset_0_0_0_100px_#11151d]";
 
+function RecoveryCard({ mode, token, onBack, onDone }: { mode: "forgot" | "reset"; token: string; onBack: () => void; onDone: (message: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [pair, setPair] = useState<PasswordPair>({ password: "", confirm: "" });
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const forgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email: email.trim() }) });
+      setSent(true);
+    } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+  };
+
+  const reset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    if (pair.password !== pair.confirm) { setError("Las contraseñas no coinciden."); return; }
+    setBusy(true);
+    setError("");
+    try {
+      await api("/auth/reset-password", { method: "POST", body: JSON.stringify({ token, password: pair.password }) });
+      onDone("Contraseña actualizada. Ya puedes iniciar sesión.");
+    } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+  };
+
+  const card = "w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-[#f2f3f5] shadow-2xl";
+  const errorBox = error && <p role="alert" className="mt-5 rounded-xl border border-[rgba(248,113,113,0.25)] bg-[rgba(248,113,113,0.1)] p-3 text-sm text-[#f87171]">{error}</p>;
+
+  if (mode === "reset") {
+    return (
+      <form onSubmit={reset} className={card}>
+        <Image src="/LogoTeko.png" width={120} height={40} alt="TEKO" className="mb-10 h-10 w-auto" />
+        <p className="text-sm font-medium text-[#1ec4ff]">Recuperar acceso</p>
+        <h2 className="mt-1 text-3xl font-bold">Crea tu nueva contraseña</h2>
+        <p className="mt-2 text-sm text-[rgba(242,243,245,0.5)]">El enlace funciona una sola vez.</p>
+        {errorBox}
+        <div className="mt-6 space-y-4">
+          <PasswordFields value={pair} onChange={(next) => { setPair(next); setError(""); }} idPrefix="reset" autoFocus label="Nueva contraseña" />
+        </div>
+        <button disabled={busy || passwordsMismatch(pair)} className="mt-7 w-full rounded-xl bg-[#1ec4ff] py-3 font-semibold text-[#080a0f] transition-all hover:brightness-110 disabled:opacity-60">
+          {busy ? "Guardando..." : "Guardar contraseña"}
+        </button>
+        <button type="button" onClick={onBack} className="mt-4 w-full rounded-lg py-2 text-sm text-[rgba(242,243,245,0.6)] transition-colors hover:text-[#f2f3f5]">Volver al inicio de sesión</button>
+      </form>
+    );
+  }
+
+  return (
+    <form onSubmit={forgot} className={card}>
+      <Image src="/LogoTeko.png" width={120} height={40} alt="TEKO" className="mb-10 h-10 w-auto" />
+      <p className="text-sm font-medium text-[#1ec4ff]">Recuperar acceso</p>
+      <h2 className="mt-1 text-3xl font-bold">¿Olvidaste tu contraseña?</h2>
+      <p className="mt-2 text-sm text-[rgba(242,243,245,0.5)]">Escribe tu correo y te enviamos un enlace para crear una nueva.</p>
+      {sent ? (
+        <p role="status" className="mt-6 rounded-xl border border-[rgba(74,222,128,0.25)] bg-[rgba(74,222,128,0.1)] p-4 text-sm leading-relaxed text-[#4ade80]">
+          Si ese correo tiene una cuenta, te enviamos un enlace. Revisa tu bandeja (y el spam); vence en 30 minutos.
+        </p>
+      ) : (
+        <>
+          {errorBox}
+          <div className="mt-6">
+            <label htmlFor="forgot-email" className="mb-2 block text-sm font-medium">Correo</label>
+            <input id="forgot-email" required type="email" inputMode="email" autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus placeholder="nombre@teko.do" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} className="tk-input h-12" />
+          </div>
+          <button disabled={busy} className="mt-7 w-full rounded-xl bg-[#1ec4ff] py-3 font-semibold text-[#080a0f] transition-all hover:brightness-110 disabled:opacity-60">
+            {busy ? "Enviando..." : "Enviar enlace"}
+          </button>
+        </>
+      )}
+      <button type="button" onClick={onBack} className="mt-4 w-full rounded-lg py-2 text-sm text-[rgba(242,243,245,0.6)] transition-colors hover:text-[#f2f3f5]">Volver al inicio de sesión</button>
+    </form>
+  );
+}
+
 function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: string, remember: boolean) => Promise<void>; onPasskey: (remember: boolean) => Promise<void> }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -174,6 +254,9 @@ function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: stri
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
+  const [resetToken] = useState(() => (typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("reset") ?? ""));
+  const [mode, setMode] = useState<"login" | "forgot" | "reset">(resetToken ? "reset" : "login");
+  const [notice, setNotice] = useState("");
   const passkeysSupported = usePasskeysSupported();
 
   const passkey = async () => {
@@ -203,117 +286,134 @@ function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: stri
 
       {/* Right: form */}
       <div className="flex items-center justify-center p-6">
-        <form
-          onSubmit={submit}
-          className="w-full max-w-md rounded-3xl border p-8 shadow-2xl"
-          style={{
-            borderColor: "rgba(255,255,255,0.1)",
-            background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
-            color: "#f2f3f5",
-          }}
-        >
-          <Image src="/LogoTeko.png" width={120} height={40} alt="TEKO" className="mb-10 h-10 w-auto" />
-          <p className="text-sm font-medium" style={{ color: "#1ec4ff" }}>Administración</p>
-          <h2 className="mt-1 text-3xl font-bold">Bienvenido de vuelta</h2>
-          <p className="mt-2 text-sm" style={{ color: "rgba(242,243,245,0.5)" }}>Ingresa con tu cuenta administrativa.</p>
-
-          {error && (
-            <p className="mt-5 rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(248,113,113,0.25)", background: "rgba(248,113,113,0.1)", color: "#f87171" }}>
-              {error}
-            </p>
-          )}
-
-          <div className="mt-8">
-            <label htmlFor="login-email" className="mb-2 block text-sm font-medium">Correo</label>
-            <div className="group relative">
-              <Mail size={17} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[rgba(242,243,245,0.35)] transition-colors group-focus-within:text-[#1ec4ff]" />
-              <input
-                id="login-email"
-                required
-                type="email"
-                name="email"
-                inputMode="email"
-                autoComplete="username"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                autoFocus
-                disabled={busy}
-                placeholder="nombre@teko.do"
-                aria-invalid={Boolean(error) || undefined}
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                className={loginInput + " pl-11 pr-4"}
-              />
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <label htmlFor="login-password" className="mb-2 block text-sm font-medium">Contraseña</label>
-            <div className="group relative">
-              <Lock size={17} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[rgba(242,243,245,0.35)] transition-colors group-focus-within:text-[#1ec4ff]" />
-              <input
-                id="login-password"
-                required
-                minLength={8}
-                type={showPassword ? "text" : "password"}
-                name="password"
-                autoComplete="current-password"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                disabled={busy}
-                placeholder="Tu contraseña"
-                aria-invalid={Boolean(error) || undefined}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
-                onBlur={() => setCapsLock(false)}
-                className={loginInput + " pl-11 pr-12"}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
-                aria-pressed={showPassword}
-                className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] transition-colors hover:bg-white/5 hover:text-[#f2f3f5] focus-visible:outline-2 focus-visible:outline-[#1ec4ff]"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            {capsLock && <p role="status" className="mt-2 text-xs" style={{ color: "#fbbf24" }}>Tienes las mayúsculas activadas.</p>}
-          </div>
-
-          <label className="mt-4 flex w-fit cursor-pointer items-center gap-2.5 text-sm" style={{ color: "rgba(242,243,245,0.7)" }}>
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="tk-check" />
-            Mantener sesión iniciada
-          </label>
-
-          <button
-            disabled={busy}
-            className="mt-7 w-full rounded-xl py-3 font-semibold transition-all hover:brightness-110 disabled:opacity-60"
-            style={{ background: "#1ec4ff", color: "#080a0f", boxShadow: "0 8px 24px -6px rgba(30,196,255,0.45)" }}
+        {mode !== "login" ? (
+          <RecoveryCard
+            mode={mode}
+            token={resetToken}
+            onBack={() => setMode("login")}
+            onDone={(message) => { setNotice(message); setMode("login"); if (typeof window !== "undefined" && resetToken) window.history.replaceState(null, "", window.location.pathname); }}
+          />
+        ) : (
+          <form
+            onSubmit={submit}
+            className="w-full max-w-md rounded-3xl border p-8 shadow-2xl"
+            style={{
+              borderColor: "rgba(255,255,255,0.1)",
+              background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
+              color: "#f2f3f5",
+            }}
           >
-            {busy ? "Verificando..." : "Iniciar sesión"}
-          </button>
+            <Image src="/LogoTeko.png" width={120} height={40} alt="TEKO" className="mb-10 h-10 w-auto" />
+            <p className="text-sm font-medium" style={{ color: "#1ec4ff" }}>Administración</p>
+            <h2 className="mt-1 text-3xl font-bold">Bienvenido de vuelta</h2>
+            <p className="mt-2 text-sm" style={{ color: "rgba(242,243,245,0.5)" }}>Ingresa con tu cuenta administrativa.</p>
 
-          {passkeysSupported && (
-            <>
-              <div className="my-4 flex items-center gap-3 text-xs" style={{ color: "rgba(242,243,245,0.4)" }}>
-                <span className="h-px flex-1 bg-current opacity-30" />o<span className="h-px flex-1 bg-current opacity-30" />
+            {notice && !error && (
+              <p role="status" className="mt-5 rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(74,222,128,0.25)", background: "rgba(74,222,128,0.1)", color: "#4ade80" }}>{notice}</p>
+            )}
+            {error && (
+              <p className="mt-5 rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(248,113,113,0.25)", background: "rgba(248,113,113,0.1)", color: "#f87171" }}>
+                {error}
+              </p>
+            )}
+
+            <div className="mt-8">
+              <label htmlFor="login-email" className="mb-2 block text-sm font-medium">Correo</label>
+              <div className="group relative">
+                <Mail size={17} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[rgba(242,243,245,0.35)] transition-colors group-focus-within:text-[#1ec4ff]" />
+                <input
+                  id="login-email"
+                  required
+                  type="email"
+                  name="email"
+                  inputMode="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoFocus
+                  disabled={busy}
+                  placeholder="nombre@teko.do"
+                  aria-invalid={Boolean(error) || undefined}
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  className={loginInput + " pl-11 pr-4"}
+                />
               </div>
-              <button
-                type="button"
-                onClick={passkey}
-                disabled={busy}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border py-3 font-semibold transition-all hover:bg-white/5 disabled:opacity-60"
-                style={{ borderColor: "rgba(30,196,255,0.4)", color: "#1ec4ff" }}
-              >
-                <Fingerprint size={18} /> Entrar con Touch ID / passkey
+            </div>
+
+            <div className="mt-4">
+              <label htmlFor="login-password" className="mb-2 block text-sm font-medium">Contraseña</label>
+              <div className="group relative">
+                <Lock size={17} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[rgba(242,243,245,0.35)] transition-colors group-focus-within:text-[#1ec4ff]" />
+                <input
+                  id="login-password"
+                  required
+                  minLength={8}
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  disabled={busy}
+                  placeholder="Tu contraseña"
+                  aria-invalid={Boolean(error) || undefined}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
+                  onBlur={() => setCapsLock(false)}
+                  className={loginInput + " pl-11 pr-12"}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                  aria-pressed={showPassword}
+                  className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] transition-colors hover:bg-white/5 hover:text-[#f2f3f5] focus-visible:outline-2 focus-visible:outline-[#1ec4ff]"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {capsLock && <p role="status" className="mt-2 text-xs" style={{ color: "#fbbf24" }}>Tienes las mayúsculas activadas.</p>}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <label className="flex w-fit cursor-pointer items-center gap-2.5 text-sm" style={{ color: "rgba(242,243,245,0.7)" }}>
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="tk-check" />
+                Mantener sesión iniciada
+              </label>
+              <button type="button" onClick={() => { setError(""); setNotice(""); setMode("forgot"); }} className="rounded-md text-sm font-medium text-[#1ec4ff] transition-colors hover:text-[#7ddcff]">
+                ¿Olvidaste tu contraseña?
               </button>
-            </>
-          )}
-        </form>
+            </div>
+
+            <button
+              disabled={busy}
+              className="mt-7 w-full rounded-xl py-3 font-semibold transition-all hover:brightness-110 disabled:opacity-60"
+              style={{ background: "#1ec4ff", color: "#080a0f", boxShadow: "0 8px 24px -6px rgba(30,196,255,0.45)" }}
+            >
+              {busy ? "Verificando..." : "Iniciar sesión"}
+            </button>
+
+            {passkeysSupported && (
+              <>
+                <div className="my-4 flex items-center gap-3 text-xs" style={{ color: "rgba(242,243,245,0.4)" }}>
+                  <span className="h-px flex-1 bg-current opacity-30" />o<span className="h-px flex-1 bg-current opacity-30" />
+                </div>
+                <button
+                  type="button"
+                  onClick={passkey}
+                  disabled={busy}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border py-3 font-semibold transition-all hover:bg-white/5 disabled:opacity-60"
+                  style={{ borderColor: "rgba(30,196,255,0.4)", color: "#1ec4ff" }}
+                >
+                  <Fingerprint size={18} /> Entrar con Touch ID / passkey
+                </button>
+              </>
+            )}
+          </form>
+        )}
       </div>
     </main>
   );
@@ -514,6 +614,7 @@ function Admins({ current }: { current: AdminUser }) {
   const [success, setSuccess] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [passwordFor, setPasswordFor] = useState<AdminUser | null>(null);
 
   const load = useCallback(() => api<AdminUser[]>("/admin/admin-users").then(setItems).catch((e: Error) => setError(e.message)), []);
   useEffect(() => { Promise.resolve().then(load); }, [load]);
@@ -586,6 +687,16 @@ function Admins({ current }: { current: AdminUser }) {
               ) : (
                 <>
                   <button
+                    disabled={busyId !== null}
+                    onClick={() => { setError(""); setSuccess(""); setPasswordFor(item); }}
+                    aria-label={`Cambiar contraseña de ${item.full_name}`}
+                    title="Cambiar contraseña (pide tu huella)"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs transition-colors hover:bg-white/5 disabled:opacity-40"
+                    style={{ borderColor: "rgba(255,255,255,0.1)", color: "rgba(242,243,245,0.7)" }}
+                  >
+                    <KeyRound size={13} />Contraseña
+                  </button>
+                  <button
                     disabled={item.id === current.id || busyId !== null}
                     onClick={() => toggle(item)}
                     className="rounded-lg border px-3 py-1.5 text-xs disabled:opacity-40"
@@ -609,33 +720,93 @@ function Admins({ current }: { current: AdminUser }) {
           </div>
         ))}
       </div>
+      {passwordFor && (
+        <ChangePasswordForm
+          target={passwordFor}
+          self={passwordFor.id === current.id}
+          close={() => setPasswordFor(null)}
+          done={() => { setSuccess(`La contraseña de ${passwordFor.full_name} fue cambiada.`); setPasswordFor(null); }}
+        />
+      )}
       {show && <AdminForm close={() => setShow(false)} saved={() => { setShow(false); setSuccess("Administrador creado correctamente."); load(); }} />}
     </section>
   );
 }
 
-const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*?";
+function ChangePasswordForm({ target, self, close, done }: { target: AdminUser; self: boolean; close: () => void; done: () => void }) {
+  const [pair, setPair] = useState<PasswordPair>({ password: "", confirm: "" });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const supported = usePasskeysSupported();
 
-/** Contraseña aleatoria de 16 caracteres, sin los que se confunden (0/O, 1/l/I). */
-function generatePassword(length = 16) {
-  const limit = 256 - (256 % PASSWORD_CHARS.length);
-  const out: string[] = [];
-  while (out.length < length) {
-    for (const byte of crypto.getRandomValues(new Uint8Array(length * 2))) {
-      if (byte < limit && out.length < length) out.push(PASSWORD_CHARS[byte % PASSWORD_CHARS.length]);
-    }
-  }
-  return out.join("");
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !saving) close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [close, saving]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    if (pair.password !== pair.confirm) { setError("Las contraseñas no coinciden."); return; }
+    setSaving(true);
+    setError("");
+    try {
+      await changePasswordWithPasskey(target.id, pair.password);
+      done();
+    } catch (err) {
+      setError(isCancelled(err) ? "Cancelaste la confirmación con tu huella. No se cambió nada." : (err as Error).message);
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) close(); }}>
+      <form
+        onSubmit={submit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="change-password-title"
+        className="tk-modal w-full max-w-md rounded-2xl border border-white/10 bg-[#0d1017] p-6 text-[#f2f3f5] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#1ec4ff]">Seguridad</p>
+            <h2 id="change-password-title" className="mt-0.5 text-xl font-bold">Cambiar contraseña</h2>
+            <p className="mt-1 truncate text-sm text-[rgba(242,243,245,0.55)]">{self ? "Tu cuenta" : target.full_name} · {target.email}</p>
+          </div>
+          <button type="button" onClick={close} disabled={saving} aria-label="Cerrar" className="grid h-8 w-8 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] transition-colors hover:bg-white/[0.06] hover:text-[#f2f3f5]"><X size={18} /></button>
+        </div>
+
+        {error && <p role="alert" className="mt-4 rounded-xl border border-[rgba(248,113,113,0.25)] bg-[rgba(248,113,113,0.1)] p-3 text-sm text-[#f87171]">{error}</p>}
+
+        <div className="mt-5 space-y-4">
+          <PasswordFields value={pair} onChange={(next) => { setPair(next); setError(""); }} idPrefix="change" autoFocus label="Nueva contraseña" />
+        </div>
+
+        <p className="mt-5 flex items-start gap-2 rounded-xl bg-white/[0.03] px-3 py-2.5 text-[13px] leading-relaxed text-[rgba(242,243,245,0.55)]">
+          <Fingerprint size={15} className="mt-0.5 shrink-0 text-[#1ec4ff]" />
+          {supported
+            ? "Para confirmar te pediremos tu huella (o el passkey de tu dispositivo). Es la tuya, no la de la otra persona."
+            : "Este navegador no permite confirmar con huella. Abre el CMS en un dispositivo con Touch ID, Windows Hello o llave de seguridad."}
+        </p>
+
+        <div className="mt-6 flex gap-3">
+          <button type="button" onClick={close} disabled={saving} className="h-11 rounded-xl border border-white/10 px-4 text-sm text-[rgba(242,243,245,0.7)] transition-colors hover:bg-white/5">Cancelar</button>
+          <button disabled={saving || !supported || passwordsMismatch(pair)} className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#1ec4ff] font-semibold text-[#080a0f] transition-all hover:brightness-110 disabled:opacity-60">
+            <Fingerprint size={17} />{saving ? "Esperando tu huella..." : "Confirmar con huella"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 function AdminForm({ close, saved }: { close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ full_name: "", email: "", password: "", confirm: "" });
-  const [show, setShow] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [form, setForm] = useState({ full_name: "", email: "" });
+  const [pair, setPair] = useState<PasswordPair>({ password: "", confirm: "" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const set = (patch: Partial<typeof form>) => { setForm((old) => ({ ...old, ...patch })); setError(""); };
-  const mismatch = form.confirm.length > 0 && form.confirm !== form.password;
+  const mismatch = passwordsMismatch(pair);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
@@ -643,40 +814,17 @@ function AdminForm({ close, saved }: { close: () => void; saved: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
-  const generate = () => {
-    const password = generatePassword();
-    set({ password, confirm: password });
-    setShow(true);
-    setCopied(false);
-  };
-
-  const copy = () => {
-    navigator.clipboard.writeText(form.password).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1800); }).catch(() => setError("No se pudo copiar. Selecciónala y cópiala a mano."));
-  };
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
-    if (form.password !== form.confirm) { setError("Las contraseñas no coinciden."); return; }
+    if (pair.password !== pair.confirm) { setError("Las contraseñas no coinciden."); return; }
     setSaving(true);
     setError("");
     try {
-      await api("/admin/admin-users", { method: "POST", body: JSON.stringify({ full_name: form.full_name.trim(), email: form.email.trim(), password: form.password, role: "admin" }) });
+      await api("/admin/admin-users", { method: "POST", body: JSON.stringify({ full_name: form.full_name.trim(), email: form.email.trim(), password: pair.password, role: "admin" }) });
       saved();
     } catch (err) { setError((err as Error).message); } finally { setSaving(false); }
   };
-
-  const eye = (
-    <button
-      type="button"
-      onClick={() => setShow((value) => !value)}
-      aria-label={show ? "Ocultar contraseña" : "Ver contraseña"}
-      aria-pressed={show}
-      className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] transition-colors hover:bg-white/5 hover:text-[#f2f3f5]"
-    >
-      {show ? <EyeOff size={17} /> : <Eye size={17} />}
-    </button>
-  );
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
@@ -700,37 +848,13 @@ function AdminForm({ close, saved }: { close: () => void; saved: () => void }) {
         <div className="mt-5 space-y-4">
           <div>
             <label htmlFor="admin-name" className="mb-1.5 block text-sm font-medium">Nombre completo</label>
-            <input id="admin-name" required minLength={2} maxLength={150} autoFocus autoComplete="off" placeholder="Ana Pérez" value={form.full_name} onChange={(e) => set({ full_name: e.target.value })} className="tk-input" />
+            <input id="admin-name" required minLength={2} maxLength={150} autoFocus autoComplete="off" placeholder="Ana Pérez" value={form.full_name} onChange={(e) => { setForm((old) => ({ ...old, full_name: e.target.value })); setError(""); }} className="tk-input" />
           </div>
           <div>
             <label htmlFor="admin-email" className="mb-1.5 block text-sm font-medium">Correo</label>
-            <input id="admin-email" required type="email" inputMode="email" autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="nombre@teko.do" value={form.email} onChange={(e) => set({ email: e.target.value })} className="tk-input" />
+            <input id="admin-email" required type="email" inputMode="email" autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="nombre@teko.do" value={form.email} onChange={(e) => { setForm((old) => ({ ...old, email: e.target.value })); setError(""); }} className="tk-input" />
           </div>
-          <div>
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-              <label htmlFor="admin-password" className="text-sm font-medium">Contraseña</label>
-              <button type="button" onClick={generate} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-[#1ec4ff] transition-colors hover:bg-[rgba(30,196,255,0.1)]">
-                <Wand2 size={13} />Generar
-              </button>
-            </div>
-            <div className="relative">
-              <input id="admin-password" required minLength={8} maxLength={128} type={show ? "text" : "password"} autoComplete="new-password" autoCapitalize="none" spellCheck={false} placeholder="Mínimo 8 caracteres" value={form.password} onChange={(e) => set({ password: e.target.value })} className={`tk-input ${show && form.password ? "pr-20 font-mono" : "pr-11"}`} />
-              {show && form.password && (
-                <button type="button" onClick={copy} aria-label="Copiar contraseña" className="absolute right-10 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] transition-colors hover:bg-white/5 hover:text-[#f2f3f5]">
-                  {copied ? <Check size={16} className="text-[#4ade80]" /> : <Copy size={16} />}
-                </button>
-              )}
-              {eye}
-            </div>
-          </div>
-          <div>
-            <label htmlFor="admin-confirm" className="mb-1.5 block text-sm font-medium">Confirmar contraseña</label>
-            <div className="relative">
-              <input id="admin-confirm" required type={show ? "text" : "password"} autoComplete="new-password" autoCapitalize="none" spellCheck={false} placeholder="Repite la contraseña" aria-invalid={mismatch || undefined} value={form.confirm} onChange={(e) => set({ confirm: e.target.value })} className={`tk-input pr-11 ${show ? "font-mono" : ""}`} />
-              {eye}
-            </div>
-            {mismatch && <p className="mt-1.5 text-xs text-[#f87171]">Las contraseñas no coinciden.</p>}
-          </div>
+          <PasswordFields value={pair} onChange={(next) => { setPair(next); setError(""); }} idPrefix="admin" />
         </div>
 
         <p className="mt-5 flex items-center gap-2 rounded-xl bg-white/[0.03] px-3 py-2.5 text-[13px] text-[rgba(242,243,245,0.55)]">

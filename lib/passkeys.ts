@@ -94,3 +94,27 @@ export async function loginWithPasskeyCeremony(remember: boolean): Promise<Admin
   });
   return finishLogin(result.access_token, remember);
 }
+
+/** Confirma con la huella de quien está conectado y cambia la contraseña del administrador indicado. */
+export async function changePasswordWithPasskey(targetId: number, password: string): Promise<void> {
+  const { token, options: o } = await api<{ token: string; options: WebauthnOptions }>(`/auth/admin-users/${targetId}/password-options`, { method: "POST" });
+  const cred = (await navigator.credentials.get({
+    publicKey: { ...o, challenge: toBuf(o.challenge), allowCredentials: descriptors(o.allowCredentials) } as PublicKeyCredentialRequestOptions,
+  })) as PublicKeyCredential | null;
+  if (!cred) throw new Error("No se obtuvo la huella.");
+  const r = cred.response as AuthenticatorAssertionResponse;
+  await api(`/auth/admin-users/${targetId}/password`, {
+    method: "POST",
+    body: JSON.stringify({
+      token,
+      password,
+      credential: {
+        id: cred.id,
+        rawId: toB64(cred.rawId),
+        type: cred.type,
+        response: { clientDataJSON: toB64(r.clientDataJSON), authenticatorData: toB64(r.authenticatorData), signature: toB64(r.signature) },
+        clientExtensionResults: cred.getClientExtensionResults(),
+      },
+    }),
+  });
+}

@@ -29,7 +29,7 @@ from app.models.admin_user import AdminUser
 from app.schemas.auth import TokenResponse
 from app.security.dependencies import get_current_admin
 from app.security.jwt import ALGORITHM
-from app.services import auth_service, planner_client
+from app.services import auth_service, password_service, planner_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["Passkeys"])
@@ -186,3 +186,62 @@ def login(body: LoginBody, request: Request, db: Session = Depends(get_db)):
     passkey.last_used_at = datetime.now(timezone.utc)
     db.commit()
     return TokenResponse(access_token=auth_service.issue_token(admin, body.remember))
+
+
+class ChangePasswordBody(BaseModel):
+    token: str
+    credential: dict
+    password: str
+
+
+@router.post("/admin-users/{target_id}/password-options")
+def change_password_options(target_id: int, request: Request, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Reto para confirmar con la huella de QUIEN CAMBIA la contraseña (cualquier administrador con passkey)."""
+    _, rp_id = _origin(request)
+    if not db.get(AdminUser, target_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Administrador no encontrado")
+    mine = db.query(AdminPasskey).filter(AdminPasskey.admin_user_id == admin.id).all()
+    if not mine:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Primero registra tu huella (passkey) en tu cuenta para poder cambiar contraseñas.")
+    options = generate_authentication_options(
+        rp_id=rp_id,
+        user_verification=UserVerificationRequirement.REQUIRED,
+        allow_credentials=[PublicKeyCredentialDescriptor(id=base64url_to_bytes(p.credential_id)) for p in mine],
+    )
+    return {"token": _sign(options.challenge, f"pwd:{target_id}", admin.id), "options": json.loads(options_to_json(options))}
+
+
+@router.post("/admin-users/{target_id}/password")
+def change_password(target_id: int, body: ChangePasswordBody, request: Request, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    origin, rp_id = _origin(request)
+    target = db.get(AdminUser, target_id)
+    if not target:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Administrador no encontrado")
+    password_service.validate_new_password(body.password)
+    # 403 y no 401: el cliente cierra la sesión ante un 401 y una huella fallida no debe sacar al administrador.
+    invalid = HTTPException(status.HTTP_403_FORBIDDEN, "No se pudo confirmar tu huella.")
+    challenge = _challenge(body.token, f"pwd:{target_id}", admin.id)
+    # La huella tiene que ser de quien está haciendo el cambio, no del usuario afectado.
+    passkey = db.query(AdminPasskey).filter(
+        AdminPasskey.credential_id == str(body.credential.get("id", "")), AdminPasskey.admin_user_id == admin.id
+    ).first()
+    if not passkey:
+        raise invalid
+    try:
+        verified = verify_authentication_response(
+            credential=body.credential,
+            expected_challenge=challenge,
+            expected_rp_id=rp_id,
+            expected_origin=origin,
+            credential_public_key=base64url_to_bytes(passkey.public_key),
+            credential_current_sign_count=passkey.sign_count,
+            require_user_verification=True,
+        )
+    except Exception as error:
+        logger.warning("Passkey confirmation for password change failed: %s", error)
+        raise invalid
+    passkey.sign_count = verified.new_sign_count
+    passkey.last_used_at = datetime.now(timezone.utc)
+    password_service.set_password(db, target, body.password)
+    logger.warning("Contraseña de admin %s cambiada por admin %s con passkey", target.id, admin.id)
+    return {"success": True}

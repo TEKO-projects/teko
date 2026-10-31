@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from fastapi.security import OAuth2PasswordRequestForm
-from app.schemas.auth import TokenResponse
+from app.schemas.auth import ForgotPasswordRequest, ResetPasswordRequest, TokenResponse
 from app.services.planner_client import PlannerError
-from app.services import auth_service
+from app.services import auth_service, password_service
 from app.schemas.admin_user import AdminUserRead
 from app.security.dependencies import get_current_admin
 
@@ -43,6 +43,19 @@ def login(
         access_token=token,
     )
     
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    # La respuesta es la misma exista o no el correo.
+    password_service.request_reset(db, payload.email)
+    return {"success": True}
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    password_service.reset_password(db, payload.token, payload.password)
+    return {"success": True}
+
+
 @router.get("/me", response_model=AdminUserRead)
 def get_me(current_admin = Depends(get_current_admin)):
     return current_admin    
