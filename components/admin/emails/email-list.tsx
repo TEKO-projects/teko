@@ -119,7 +119,7 @@ export function EmailList({ folder, items, selectedId, onSelect, loading, refres
               {search ? <>Sin <Serif>resultados</Serif></> : folder === "inbound" ? <>Bandeja <Serif>al día</Serif></> : <>Nada <Serif>enviado</Serif> todavía</>}
             </p>
             <p className="mt-1.5 max-w-[30ch] text-[13px] leading-relaxed text-[rgba(242,243,245,0.45)]">
-              {search ? "Prueba con otro nombre, correo o asunto." : folder === "inbound" ? "Los correos que lleguen a tu dominio aparecerán aquí." : "Lo que envíes desde el panel queda guardado en esta carpeta."}
+              {search ? "Prueba con otro nombre, correo o asunto." : folder === "inbound" ? "Aquí llega lo dirigido a la dirección general del CMS." : "Lo que envíes desde el panel queda guardado en esta carpeta."}
             </p>
           </div>
         ) : (

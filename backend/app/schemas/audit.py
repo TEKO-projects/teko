@@ -6,7 +6,7 @@ from app.schemas.email_message import EmailMessageDetail, EmailMessageListItem
 class AuditEmailItem(EmailMessageListItem):
     # Direcciones institucionales en cuyo buzón está el correo (enviado o recibido).
     owners: list[str] = []
-    # "general" si es de la dirección compartida del CMS; "personal" si es de un buzón.
+    # "general": dirección compartida del CMS; "personal": de un buzón; "unassigned": recibido en una dirección sin buzón.
     scope: str = "general"
 
 

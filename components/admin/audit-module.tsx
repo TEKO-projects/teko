@@ -7,17 +7,19 @@ import { Avatar, EmailFrame, Serif, displayName, formatFullDate, formatListTime,
 
 const PAGE_SIZE = 100;
 
-type Direction = "all" | "inbound" | "outbound";
+type Direction = "all" | "inbound" | "outbound" | "unassigned";
 
 const directions: Array<{ key: Direction; label: string }> = [
   { key: "all", label: "Todo" },
   { key: "inbound", label: "Recibidos" },
   { key: "outbound", label: "Enviados" },
+  { key: "unassigned", label: "Sin asignar" },
 ];
 
 function Owners({ item }: { item: Pick<AuditEmail, "owners" | "scope"> }) {
   if (item.owners.length === 0) {
-    return <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-[rgba(242,243,245,0.6)]">{item.scope === "general" ? "General" : "Sin buzón"}</span>;
+    if (item.scope === "unassigned") return <span className="rounded-full bg-[rgba(251,191,36,0.12)] px-2 py-0.5 text-[11px] font-medium text-[#fbbf24]">Sin asignar</span>;
+    return <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-[rgba(242,243,245,0.6)]">General</span>;
   }
   return (
     <>
@@ -150,8 +152,11 @@ export function AuditModule() {
 
   const params = useCallback((offset: number) => {
     const values = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
-    if (direction !== "all") values.set("direction", direction);
-    if (mailbox) values.set("mailbox", mailbox);
+    if (direction === "unassigned") values.set("mailbox", "unassigned");
+    else {
+      if (direction !== "all") values.set("direction", direction);
+      if (mailbox) values.set("mailbox", mailbox);
+    }
     if (query) values.set("search", query);
     return values.toString();
   }, [direction, mailbox, query]);
@@ -233,7 +238,7 @@ export function AuditModule() {
                 <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
               </button>
             </div>
-            <select value={mailbox} onChange={(e) => setMailbox(e.target.value)} aria-label="Buzón" className="tk-input !h-9 !py-0 !text-[13px]">
+            <select value={mailbox} onChange={(e) => setMailbox(e.target.value)} disabled={direction === "unassigned"} aria-label="Buzón" className="tk-input !h-9 !py-0 !text-[13px]">
               <option value="" style={{ background: "#0d1017" }}>Todos los buzones</option>
               <option value="general" style={{ background: "#0d1017" }}>General (dirección compartida)</option>
               {sortedMailboxes.map((box) => (
@@ -243,12 +248,17 @@ export function AuditModule() {
           </div>
 
           <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2">
+            {direction === "unassigned" && (
+              <p className="m-1 rounded-lg bg-[rgba(251,191,36,0.07)] p-3 text-[12.5px] leading-relaxed text-[rgba(242,243,245,0.65)]">
+                Correos recibidos en direcciones que no tienen buzón. Nadie los ve en Correos; para que lleguen a una persona, crea su buzón en Ad. de Correos y se le entregan solos.
+              </p>
+            )}
             {error ? (
               <p className="m-2 rounded-lg bg-[rgba(248,113,113,0.1)] p-3 text-[13px] text-[#fca5a5]">{error}</p>
             ) : loading && items.length === 0 ? (
               [1, 2, 3, 4].map((key) => <div key={key} className="m-1 h-[86px] animate-pulse rounded-xl bg-white/[0.04]" />)
             ) : items.length === 0 ? (
-              <p className="px-6 pt-16 text-center text-[13px] leading-relaxed text-[rgba(242,243,245,0.45)]">{query || mailbox || direction !== "all" ? "Ningún correo coincide con estos filtros." : "Todavía no hay correos."}</p>
+              <p className="px-6 pt-16 text-center text-[13px] leading-relaxed text-[rgba(242,243,245,0.45)]">{direction === "unassigned" && !query ? "No hay correos sin asignar." : query || mailbox || direction !== "all" ? "Ningún correo coincide con estos filtros." : "Todavía no hay correos."}</p>
             ) : (
               <>
                 {items.map((item) => <Row key={item.id} item={item} selected={selectedId === item.id} onSelect={() => open(item)} />)}
