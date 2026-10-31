@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Eye, Inbox, LoaderCircle, Paperclip, RefreshCw, Search, Send, TriangleAlert } from "lucide-react";
-import { api, type AuditEmail, type AuditEmailDetail, type Mailbox } from "@/lib/admin-api";
+import { Activity, ArrowLeft, ChevronDown, Eye, Inbox, LoaderCircle, Paperclip, RefreshCw, Search, Send, TriangleAlert } from "lucide-react";
+import { API_URL, api, type AuditEmail, type AuditEmailDetail, type InboundStatus, type Mailbox } from "@/lib/admin-api";
 import { Avatar, EmailFrame, Serif, displayName, formatFullDate, formatListTime, recipientsLabel, statusMeta } from "./emails/email-ui";
 
 const PAGE_SIZE = 100;
@@ -124,6 +124,95 @@ function Detail({ email, onBack }: { email: AuditEmailDetail; onBack: () => void
   );
 }
 
+type Level = "ok" | "warn" | "bad";
+
+function diagnose(s: InboundStatus): { level: Level; title: string; hint: string } {
+  const webhookUrl = `${API_URL}/webhooks/resend`;
+  const rejected = s.webhooks.find((w) => w.outcome === "bad_signature" && w.detail?.startsWith("firma que no coincide"));
+  const failed = s.webhooks.find((w) => w.outcome === "error");
+  const received = s.webhooks.some((w) => w.outcome === "received");
+  if (!s.webhook_secret_configured) return { level: "bad", title: "Falta el secreto del webhook", hint: "El servidor no tiene RESEND_WEBHOOK_SECRET y rechaza todo lo que Resend le envía. Cópialo de Resend → Webhooks → Signing secret y ponlo en las variables de Railway." };
+  if (rejected) return { level: "bad", title: "Resend está avisando, pero la firma no coincide", hint: "El secreto guardado en Railway (RESEND_WEBHOOK_SECRET) no es el del webhook que llama a este servidor. Copia el Signing secret de ESE webhook en Resend." };
+  if (failed) return { level: "bad", title: "El webhook llegó pero falló al guardar el correo", hint: `Error: ${failed.detail ?? "sin detalle"}. Revisa los registros de Railway.` };
+  if (received || s.inbound_24h > 0) return { level: "ok", title: "La recepción funciona", hint: s.last_inbound_error ? `Último correo guardado con aviso: ${s.last_inbound_error}` : "Resend está entregando correo a este servidor." };
+  if (s.webhooks.length === 0) return { level: "warn", title: "Resend no ha avisado desde el último reinicio del servidor", hint: `Envía un correo a ${s.general_address ?? "tu dirección general"} y actualiza. Si sigue sin aparecer: en Resend revisa que el dominio tenga activa la recepción (registro MX) y que haya un webhook a ${webhookUrl} con el evento email.received.` };
+  return { level: "warn", title: "Solo han llegado avisos de envíos, ninguno de correo recibido", hint: `Resend avisa de los correos enviados, pero no de los entrantes. En Resend, el webhook a ${webhookUrl} debe incluir el evento email.received, y el dominio debe tener activa la recepción (MX).` };
+}
+
+const OUTCOME: Record<string, string> = {
+  received: "Correo recibido", duplicate: "Duplicado", updated: "Estado de envío", skipped: "Sin cambios", ignored: "Evento ignorado", unknown: "Envío desconocido",
+  bad_signature: "Rechazado: firma", no_secret: "Rechazado: sin secreto", bad_json: "Cuerpo inválido", error: "Error al guardar",
+};
+
+function InboundStatusCard() {
+  const [status, setStatus] = useState<InboundStatus | null>(null);
+  const [error, setError] = useState("");
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api<InboundStatus>("/admin/audit/inbound-status").then((value) => { setStatus(value); setError(""); }).catch((e: Error) => setError(e.message)).finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { Promise.resolve().then(load); }, [load]);
+
+  if (error) return <p className="mb-4 rounded-xl bg-[rgba(248,113,113,0.1)] p-3 text-[13px] text-[#fca5a5]">No se pudo leer el estado de la recepción: {error}</p>;
+  if (!status) return <div className="mb-4 h-[58px] animate-pulse rounded-2xl bg-white/[0.04]" />;
+  const result = diagnose(status);
+  const color = result.level === "ok" ? "#4ade80" : result.level === "warn" ? "#fbbf24" : "#f87171";
+  const ago = (iso: string) => new Date(iso).toLocaleString("es-DO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
+
+  return (
+    <section aria-label="Estado de la recepción de correo" className="mb-4 overflow-hidden rounded-2xl border bg-white/[0.02]" style={{ borderColor: `${color}40` }}>
+      <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+        <Activity size={16} style={{ color }} className="shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] font-semibold" style={{ color }}>{result.title}</span>
+          <span className="mt-0.5 block text-[12.5px] leading-relaxed text-[rgba(242,243,245,0.6)]">{result.hint}</span>
+        </span>
+        <ChevronDown size={16} className={`shrink-0 text-[rgba(242,243,245,0.45)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="space-y-4 border-t border-white/[0.06] px-4 py-4 text-[12.5px]">
+          <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+            {([
+              ["Secreto del webhook", status.webhook_secret_configured ? "Configurado" : "Falta"],
+              ["Clave de Resend (API)", status.api_key_configured ? "Configurada" : "Falta"],
+              ["Dirección general", status.general_address ?? "Falta RESEND_FROM_EMAIL"],
+              ["Último correo recibido", status.last_inbound_at ? `${ago(status.last_inbound_at)} · para ${status.last_inbound_to ?? "—"}` : "Ninguno todavía"],
+              ["Recibidos en 24 h / en total", `${status.inbound_24h} / ${status.inbound_total}`],
+              ["Servidor reiniciado", ago(status.api_started_at)],
+            ] as const).map(([label, value]) => (
+              <div key={label} className="flex justify-between gap-3 border-b border-white/[0.04] pb-1.5"><dt className="text-[rgba(242,243,245,0.45)]">{label}</dt><dd className="min-w-0 truncate text-right text-[rgba(242,243,245,0.85)]">{value}</dd></div>
+            ))}
+          </dl>
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="font-semibold text-[rgba(242,243,245,0.75)]">Avisos de Resend desde el último reinicio</p>
+              <button type="button" onClick={load} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[#1ec4ff] hover:bg-[rgba(30,196,255,0.08)]"><RefreshCw size={12} className={loading ? "animate-spin" : ""} />Actualizar</button>
+            </div>
+            {status.webhooks.length === 0 ? (
+              <p className="rounded-lg bg-white/[0.03] p-3 text-[rgba(242,243,245,0.5)]">Ninguno. Resend no ha llamado a este servidor.</p>
+            ) : (
+              <ul className="divide-y divide-white/[0.05] rounded-lg bg-white/[0.03]">
+                {status.webhooks.slice(0, 12).map((w, index) => (
+                  <li key={`${w.at}-${index}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-3 py-2">
+                    <time className="tabular-nums text-[rgba(242,243,245,0.45)]">{ago(w.at)}</time>
+                    <span className="font-medium" style={{ color: ["bad_signature", "no_secret", "bad_json", "error"].includes(w.outcome) ? "#f87171" : "rgba(242,243,245,0.85)" }}>{OUTCOME[w.outcome] ?? w.outcome}</span>
+                    {w.event && <span className="text-[rgba(242,243,245,0.45)]">{w.event}</span>}
+                    {w.detail && <span className="w-full text-[rgba(242,243,245,0.5)]">{w.detail}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <p className="leading-relaxed text-[rgba(242,243,245,0.5)]">URL del webhook en Resend: <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[rgba(242,243,245,0.8)]">{API_URL}/webhooks/resend</code> · evento <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[rgba(242,243,245,0.8)]">email.received</code></p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function AuditModule() {
   const [items, setItems] = useState<AuditEmail[]>([]);
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
@@ -217,6 +306,8 @@ export function AuditModule() {
           Todo lo que reciben y envían los usuarios, en solo lectura. Aquí puedes revisar cualquier buzón; para leer y responder tu propio correo usa Correos.
         </p>
       </div>
+
+      <InboundStatusCard />
 
       <div className="relative flex h-[calc(100dvh-17rem)] min-h-[480px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0d13] text-[#f2f3f5]">
         <div className={`${detailOpen ? "hidden lg:flex" : "flex"} w-full shrink-0 flex-col border-r border-white/[0.06] lg:w-[400px] xl:w-[440px]`}>

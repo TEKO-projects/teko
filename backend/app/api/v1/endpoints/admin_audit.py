@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.audit import AuditEmailDetail, AuditEmailItem
+from app.schemas.audit import AuditEmailDetail, AuditEmailItem, InboundStatus
 from app.security.dependencies import get_current_admin
 from app.services import audit_service
 
@@ -11,6 +11,11 @@ router = APIRouter(
     prefix="/admin/audit",
     tags=["Admin - Auditoría"],
 )
+
+
+@router.get("/inbound-status", response_model=InboundStatus)
+def inbound_status(db: Session = Depends(get_db), current_admin=Depends(get_current_admin)):
+    return audit_service.inbound_status(db)
 
 
 @router.get("/emails", response_model=list[AuditEmailItem])
