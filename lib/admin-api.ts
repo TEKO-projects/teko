@@ -85,6 +85,7 @@ export interface EmailTemplate extends EmailTemplateInput { id: number; created_
 export interface Mailbox { id: number; address: string; display_name: string; signature: string | null; is_active: boolean; planner_user_id: string | null; admin_user_id?: number | null; planner_user_name: string; planner_user_email: string; created_at: string; updated_at: string; total_messages: number; unread_messages: number; notice_sent?: boolean | null }
 export interface AuditEmail extends EmailMessage { owners: string[]; scope: "general" | "personal" | "unassigned" }
 export interface AuditEmailDetail extends EmailMessageDetail { owners: string[]; scope: "general" | "personal" | "unassigned" }
+export interface InboundStatus { webhook_secret_configured: boolean; api_key_configured: boolean; general_address: string | null; last_inbound_at: string | null; last_inbound_to: string | null; last_inbound_error: string | null; inbound_24h: number; inbound_total: number; api_started_at: string; webhooks: Array<{ at: string; outcome: string; event: string | null; detail: string | null }> }
 export interface CmsUser { id: number; name: string; email: string; role: string; mailbox_address: string | null }
 export interface MyMailbox { enabled: boolean; address: string | null; display_name: string | null; signature: string | null; unread: number; general_address?: string | null }
 export interface PlannerUser { id: string; name: string; email: string; role: string; job_title: string | null; mailbox_address: string | null }
