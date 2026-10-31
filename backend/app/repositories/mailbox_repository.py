@@ -100,25 +100,30 @@ def backfill_inbound(db: Session, mailbox: Mailbox) -> int:
 
 
 def reclassify_general(db: Session, general_address: str) -> tuple[int, int]:
-    """Saca de General el correo recibido que es de personas con buzón y lo enlaza a su buzón.
+    """Deja en General solo el correo de la dirección general y enlaza el resto a sus dueños.
 
-    Es idempotente. Devuelve (mensajes sacados de General, enlaces creados). Se queda en
-    General lo dirigido a la dirección general o a direcciones sin dueño.
+    Revisa el correo recibido que está marcado como general o que no tiene ningún buzón
+    enlazado. Es idempotente. Devuelve (mensajes sacados de General, enlaces creados).
+    El correo a direcciones sin buzón queda fuera de General y sin enlazar ("sin asignar").
     """
     general = (general_address or "").strip().lower()
     if not general:
         return 0, 0
     owners = {address.lower(): mailbox_id for mailbox_id, address in db.query(Mailbox.id, Mailbox.address).all()}
-    if not owners:
-        return 0, 0
+    linked_any = db.query(MailboxMessage.email_message_id).distinct()
+    candidates = db.query(EmailMessage).filter(
+        EmailMessage.direction == "inbound",
+        or_(EmailMessage.is_general.is_(True), EmailMessage.id.notin_(linked_any)),
+    ).all()
     moved = linked = 0
-    for message in db.query(EmailMessage).filter(EmailMessage.direction == "inbound", EmailMessage.is_general.is_(True)).all():
+    for message in candidates:
         recipients = extract_addresses(message.to_email, message.cc, message.bcc)
-        mailbox_ids = sorted({owners[address] for address in recipients if address in owners})
-        if general in recipients or not mailbox_ids:
+        if general in recipients:
             continue
-        message.is_general = False
-        moved += 1
+        if message.is_general:
+            message.is_general = False
+            moved += 1
+        mailbox_ids = sorted({owners[address] for address in recipients if address in owners})
         have = {row[0] for row in db.query(MailboxMessage.mailbox_id).filter(MailboxMessage.email_message_id == message.id)}
         for mailbox_id in mailbox_ids:
             if mailbox_id not in have:

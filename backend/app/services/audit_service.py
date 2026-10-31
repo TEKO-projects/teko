@@ -29,8 +29,11 @@ def _owners(db: Session, ids: list[int]) -> dict[int, list[str]]:
     return owners
 
 
-def _scope(message: EmailMessage) -> str:
-    return "general" if message.is_general else "personal"
+def _scope(message: EmailMessage, owners: list[str]) -> str:
+    """general: dirección compartida; personal: de un buzón; unassigned: recibido en una dirección sin buzón."""
+    if message.is_general:
+        return "general"
+    return "personal" if owners else "unassigned"
 
 
 def list_emails(db: Session, *, direction: str | None, search: str | None, mailbox: str | None, limit: int, offset: int) -> list[AuditEmailItem]:
@@ -47,6 +50,9 @@ def list_emails(db: Session, *, direction: str | None, search: str | None, mailb
         ))
     if mailbox == "general":
         query = query.filter(EmailMessage.is_general.is_(True))
+    elif mailbox == "unassigned":
+        any_link = db.query(MailboxMessage.email_message_id)
+        query = query.filter(EmailMessage.direction == "inbound", EmailMessage.is_general.is_(False), EmailMessage.id.notin_(any_link))
     elif mailbox:
         linked = (
             db.query(MailboxMessage.email_message_id)
@@ -58,7 +64,7 @@ def list_emails(db: Session, *, direction: str | None, search: str | None, mailb
     messages = query.order_by(EmailMessage.created_at.desc(), EmailMessage.id.desc()).offset(offset).limit(limit).all()
     owners = _owners(db, [message.id for message in messages])
     return [
-        AuditEmailItem.model_validate(message).model_copy(update={"owners": owners.get(message.id, []), "scope": _scope(message)})
+        AuditEmailItem.model_validate(message).model_copy(update={"owners": owners.get(message.id, []), "scope": _scope(message, owners.get(message.id, []))})
         for message in messages
     ]
 
@@ -68,4 +74,4 @@ def get_email(db: Session, email_id: int) -> AuditEmailDetail:
     if not message:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Correo no encontrado")
     owners = _owners(db, [message.id])
-    return AuditEmailDetail.model_validate(message).model_copy(update={"owners": owners.get(message.id, []), "scope": _scope(message)})
+    return AuditEmailDetail.model_validate(message).model_copy(update={"owners": owners.get(message.id, []), "scope": _scope(message, owners.get(message.id, []))})

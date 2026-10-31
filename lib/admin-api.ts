@@ -83,8 +83,8 @@ export interface SignatureCard { name: string; title: string | null; phone: stri
 export interface EmailTemplateInput { name: string; logo_url: string | null; header_background: string; accent_color: string; occasion: string | null; kicker: string | null; headline: string | null; button_label: string | null; button_url: string | null; signature: string | null; signature_style: SignatureStyle; signature_card: SignatureCard | null; footer_text: string | null; social_links: SocialLink[]; is_default: boolean }
 export interface EmailTemplate extends EmailTemplateInput { id: number; created_at: string; updated_at: string }
 export interface Mailbox { id: number; address: string; display_name: string; signature: string | null; is_active: boolean; planner_user_id: string | null; admin_user_id?: number | null; planner_user_name: string; planner_user_email: string; created_at: string; updated_at: string; total_messages: number; unread_messages: number; notice_sent?: boolean | null }
-export interface AuditEmail extends EmailMessage { owners: string[]; scope: "general" | "personal" }
-export interface AuditEmailDetail extends EmailMessageDetail { owners: string[]; scope: "general" | "personal" }
+export interface AuditEmail extends EmailMessage { owners: string[]; scope: "general" | "personal" | "unassigned" }
+export interface AuditEmailDetail extends EmailMessageDetail { owners: string[]; scope: "general" | "personal" | "unassigned" }
 export interface CmsUser { id: number; name: string; email: string; role: string; mailbox_address: string | null }
 export interface MyMailbox { enabled: boolean; address: string | null; display_name: string | null; signature: string | null; unread: number }
 export interface PlannerUser { id: string; name: string; email: string; role: string; job_title: string | null; mailbox_address: string | null }

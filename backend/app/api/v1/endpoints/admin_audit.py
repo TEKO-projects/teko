@@ -17,7 +17,7 @@ router = APIRouter(
 def list_emails(
     direction: str | None = Query(default=None, pattern="^(inbound|outbound)$"),
     search: str | None = Query(default=None, max_length=200),
-    mailbox: str | None = Query(default=None, max_length=320, description="'general' o la dirección de un buzón"),
+    mailbox: str | None = Query(default=None, max_length=320, description="'general', 'unassigned' (sin buzón) o la dirección de un buzón"),
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
