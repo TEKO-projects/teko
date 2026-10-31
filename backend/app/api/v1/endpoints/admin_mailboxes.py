@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.schemas.mailbox import MailboxCreate, MailboxRead, MailboxRequestRead, MailboxRequestUpdate, MailboxUpdate, MailDomain, PlannerUser
+from app.schemas.mailbox import MailboxCreate, MailboxRead, MailboxRequestRead, MailboxRequestUpdate, MailboxUpdate, MailDomain, PlannerUser, CmsUser
 from app.security.dependencies import get_current_admin
 from app.services import mailbox_service
 
@@ -26,6 +26,11 @@ def mail_domain(current_admin=Depends(get_current_admin)):
 @router.get("/planner-users", response_model=list[PlannerUser])
 def planner_users(db: Session = Depends(get_db), current_admin=Depends(get_current_admin)):
     return mailbox_service.planner_users(db)
+
+
+@router.get("/cms-users", response_model=list[CmsUser])
+def cms_users(db: Session = Depends(get_db), current_admin=Depends(get_current_admin)):
+    return mailbox_service.cms_users(db)
 
 
 @router.get("/requests", response_model=list[MailboxRequestRead])

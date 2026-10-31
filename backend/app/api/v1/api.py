@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin_catalog, admin_contact_requests, admin_email_templates, admin_emails, admin_mailboxes, admin_notifications, auth, budget_ranges, contact_requests, faqs, health, leads, passkeys, planner_mail, plans, portfolio, services, webhooks
+from app.api.v1.endpoints import admin_catalog, admin_contact_requests, admin_email_templates, admin_emails, admin_mailboxes, admin_my_mailbox, admin_notifications, auth, budget_ranges, contact_requests, faqs, health, leads, passkeys, planner_mail, plans, portfolio, services, webhooks
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -18,6 +18,7 @@ api_router.include_router(portfolio.router)
 api_router.include_router(admin_emails.router)
 api_router.include_router(admin_email_templates.router)
 api_router.include_router(admin_mailboxes.router)
+api_router.include_router(admin_my_mailbox.router)
 api_router.include_router(admin_notifications.router)
 api_router.include_router(planner_mail.router)
 api_router.include_router(webhooks.router)

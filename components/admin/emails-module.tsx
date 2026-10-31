@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Inbox, LayoutTemplate, Mail, PenSquare, Send } from "lucide-react";
-import { api, type EmailMessage, type EmailMessageDetail, type EmailTemplate } from "@/lib/admin-api";
+import { api, type EmailMessage, type EmailMessageDetail, type EmailTemplate, type MyMailbox } from "@/lib/admin-api";
 import { EmailComposer, draftHasContent, emptyDraft, type ComposeDraft } from "./emails/email-composer";
 import { EmailList } from "./emails/email-list";
 import { EmailReader, ReplyPrompt } from "./emails/email-reader";
 import { TemplateEditor, TemplateList } from "./emails/email-templates";
-import { Kbd, Serif, displayName, formatFullDate, isTypingTarget, parseAddress, type Folder } from "./emails/email-ui";
+import { Kbd, Serif, displayName, formatFullDate, isTypingTarget, mailPaths, parseAddress, type Folder, type MailBox } from "./emails/email-ui";
 
 const PAGE_SIZE = 100;
 const POLL_MS = 30_000;
@@ -33,6 +33,8 @@ function prefixSubject(prefix: "Re" | "Fwd", subject: string | null) {
 
 export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }) {
   const [folder, setFolder] = useState<Folder>("inbound");
+  const [box, setBox] = useState<MailBox>("general");
+  const [mine, setMine] = useState<MyMailbox | null>(null);
   const [items, setItems] = useState<EmailMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,6 +52,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
   const [toast, setToast] = useState<Toast | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const openRequest = useRef(0);
+  const paths = useMemo(() => mailPaths(box), [box]);
 
   const notify = useCallback((message: string, action?: Toast["action"]) => setToast({ id: Date.now(), message, action }), []);
 
@@ -65,7 +68,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
     try {
       const offset = mode === "more" ? count : 0;
       const limit = mode === "silent" ? Math.min(Math.max(count, PAGE_SIZE), 200) : PAGE_SIZE;
-      const page = await api<EmailMessage[]>(`/admin/emails?direction=${folder}&limit=${limit}&offset=${offset}`);
+      const page = await api<EmailMessage[]>(paths.list(`direction=${folder}&limit=${limit}&offset=${offset}`));
       setItems((current) => (mode === "more" ? [...current, ...page] : page));
       setHasMore(page.length === limit);
     } catch (e) {
@@ -74,7 +77,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
       setLoading(false);
       setRefreshing(false);
     }
-  }, [folder, notify]);
+  }, [folder, notify, paths]);
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -89,16 +92,26 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
   useEffect(() => { Promise.resolve().then(() => loadList()); }, [loadList]);
   useEffect(() => { Promise.resolve().then(loadTemplates); }, [loadTemplates]);
 
+  const loadMine = useCallback(() => {
+    api<MyMailbox>("/admin/my-mailbox").then((summary) => {
+      setMine(summary);
+      // Si le deshabilitaron el correo mientras lo veía, vuelve al general.
+      if (!summary.enabled) setBox("general");
+    }).catch(() => undefined);
+  }, []);
+  useEffect(() => { Promise.resolve().then(loadMine); }, [loadMine]);
+
   const itemCount = items.length;
   useEffect(() => {
     if (folder === "templates") return;
     const timer = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       loadList("silent", itemCount);
+      loadMine();
       onUnreadChange?.();
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [folder, itemCount, loadList, onUnreadChange]);
+  }, [folder, itemCount, loadList, loadMine, onUnreadChange]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -120,6 +133,21 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
     if (next !== "templates") { setItems([]); setLoading(true); }
   };
 
+  const changeBox = (next: MailBox) => {
+    if (next === box) return;
+    setBox(next);
+    setSearch("");
+    setSelectedId(null);
+    setDetail(null);
+    setView("reader");
+    setInlineOpen(false);
+    // Una respuesta solo tiene sentido en el buzón donde llegó el correo.
+    if (draft?.mode === "reply") setDraft(null);
+    if (folder === "templates") setFolder("inbound");
+    setItems([]);
+    setLoading(true);
+  };
+
   const openEmail = async (item: EmailMessage) => {
     const request = ++openRequest.current;
     setSelectedId(item.id);
@@ -127,11 +155,11 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
     setInlineOpen(false);
     setDetailLoading(true);
     try {
-      const loaded = await api<EmailMessageDetail>(`/admin/emails/${item.id}`);
+      const loaded = await api<EmailMessageDetail>(paths.item(item.id));
       if (request !== openRequest.current) return;
       setDetail(loaded);
       if (item.direction === "inbound" && !item.is_read) {
-        await api(`/admin/emails/${item.id}/read`, { method: "PATCH", body: JSON.stringify({ is_read: true }) });
+        await api(paths.read(item.id), { method: "PATCH", body: JSON.stringify({ is_read: true }) });
         setItems((current) => current.map((row) => (row.id === item.id ? { ...row, is_read: true } : row)));
         onUnreadChange?.();
       }
@@ -184,7 +212,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
 
   const markUnread = async (email: EmailMessageDetail) => {
     try {
-      await api(`/admin/emails/${email.id}/read`, { method: "PATCH", body: JSON.stringify({ is_read: false }) });
+      await api(paths.read(email.id), { method: "PATCH", body: JSON.stringify({ is_read: false }) });
       setItems((current) => current.map((row) => (row.id === email.id ? { ...row, is_read: false } : row)));
       setSelectedId(null);
       setDetail(null);
@@ -256,8 +284,22 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
   const detailOpen = folder === "templates" ? selectedTemplate !== null : view === "composer" || selectedId !== null;
   const canContinueDraft = Boolean(draft && draft.mode !== "reply" && draftHasContent(draft));
 
+  const boxSwitch = mine?.enabled ? (
+    <div role="tablist" aria-label="Buzón" className="flex rounded-lg bg-white/[0.04] p-0.5">
+      {([["general", "General", null], ["mine", "Mi correo", mine.unread]] as const).map(([key, label, count]) => (
+        <button key={key} role="tab" aria-selected={box === key} type="button" onClick={() => changeBox(key)} title={key === "mine" ? mine.address ?? undefined : undefined}
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[12.5px] font-medium transition-colors ${box === key ? "bg-white/[0.09] text-[#f2f3f5]" : "text-[rgba(242,243,245,0.55)] hover:text-[#f2f3f5]"}`}>
+          {label}
+          {count ? <span className="text-[11px] font-semibold text-[#1ec4ff]">{count}</span> : null}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   const folderTabs = (
-    <div className="flex items-center gap-2 xl:hidden">
+    <div className="flex flex-col gap-2 xl:hidden">
+      {boxSwitch}
+      <div className="flex items-center gap-2">
       <div role="tablist" aria-label="Carpetas" className="flex flex-1 rounded-lg bg-white/[0.04] p-0.5">
         {folders.map((item) => (
           <button key={item.key} role="tab" aria-selected={folder === item.key} type="button" onClick={() => changeFolder(item.key)}
@@ -270,6 +312,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
       <button type="button" onClick={startCompose} aria-label="Redactar" title="Redactar (C)" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#1ec4ff] text-[#080a0f]">
         <PenSquare size={15} />
       </button>
+      </div>
     </div>
   );
 
@@ -291,7 +334,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
     );
   } else if (view === "composer" && draft) {
     rightPane = (
-      <EmailComposer draft={draft} onChange={setDraft} templates={templates} onClose={() => setView("reader")} onDiscard={discardDraft} onSent={handleSent} />
+      <EmailComposer box={box} draft={draft} onChange={setDraft} templates={templates} onClose={() => setView("reader")} onDiscard={discardDraft} onSent={handleSent} />
     );
   } else if (selectedId !== null && (detailLoading || !detail)) {
     rightPane = <ReaderSkeleton />;
@@ -306,7 +349,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
         onCopy={copy}
         replySlot={replyTarget ? (
           replyDraft && inlineOpen ? (
-            <EmailComposer variant="inline" draft={replyDraft} onChange={setDraft} templates={templates} onClose={() => setInlineOpen(false)} onDiscard={discardDraft} onSent={handleSent} />
+            <EmailComposer box={box} variant="inline" draft={replyDraft} onChange={setDraft} templates={templates} onClose={() => setInlineOpen(false)} onDiscard={discardDraft} onSent={handleSent} />
           ) : (
             <ReplyPrompt name={replyDraft ? "tu borrador" : displayName(replyTarget.from_email)} onClick={() => startReply(replyTarget)} />
           )
@@ -326,6 +369,7 @@ export function EmailsModule({ onUnreadChange }: { onUnreadChange?: () => void }
     <section aria-label="Correos" className="relative flex h-[calc(100dvh-7rem)] min-h-[540px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0d13] text-[#f2f3f5] lg:h-[calc(100dvh-9rem)]">
       <aside className="hidden w-[212px] shrink-0 flex-col border-r border-white/[0.06] p-3 xl:flex">
         <p className="px-2 pb-4 pt-1 text-[15px] font-semibold tracking-[-0.01em]">Correos</p>
+        {boxSwitch && <div className="mb-3">{boxSwitch}</div>}
         <button type="button" onClick={startCompose} className="flex h-10 items-center gap-2 rounded-xl bg-[#1ec4ff] px-3.5 text-[13.5px] font-semibold text-[#080a0f] transition-[filter] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1ec4ff]">
           <PenSquare size={16} />
           <span className="flex-1 text-left">{canContinueDraft ? "Ver borrador" : "Redactar"}</span>

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # Parte local de la dirección: letras, números y . _ - entre ellas (john.marte, ana_p).
 LOCAL_PART = r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
@@ -10,7 +10,15 @@ class MailboxCreate(BaseModel):
     local_part: str = Field(min_length=1, max_length=64, pattern=LOCAL_PART)
     display_name: str = Field(min_length=1, max_length=150)
     signature: str | None = Field(default=None, max_length=2_000)
-    planner_user_id: str = Field(min_length=1, max_length=64)
+    # Dueño del correo: un empleado del Planner o un usuario del CMS, uno solo.
+    planner_user_id: str | None = Field(default=None, min_length=1, max_length=64)
+    admin_user_id: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _one_owner(self):
+        if (self.planner_user_id is None) == (self.admin_user_id is None):
+            raise ValueError("Elige un empleado del Planner o un usuario del CMS.")
+        return self
 
 
 class MailboxUpdate(BaseModel):
@@ -25,7 +33,8 @@ class MailboxRead(BaseModel):
     display_name: str
     signature: str | None
     is_active: bool
-    planner_user_id: str
+    planner_user_id: str | None = None
+    admin_user_id: int | None = None
     planner_user_name: str
     planner_user_email: str
     created_at: datetime
@@ -47,6 +56,14 @@ class PlannerUser(BaseModel):
     mailbox_address: str | None = None
 
 
+class CmsUser(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: str
+    mailbox_address: str | None = None
+
+
 class MailDomain(BaseModel):
     domain: str
 
@@ -56,6 +73,16 @@ class OwnMailbox(BaseModel):
     display_name: str
     signature: str | None
     unread: int
+
+
+class MyMailbox(BaseModel):
+    """Estado del correo institucional del usuario del CMS que consulta."""
+
+    enabled: bool
+    address: str | None = None
+    display_name: str | None = None
+    signature: str | None = None
+    unread: int = 0
 
 
 class OwnMailboxUpdate(BaseModel):

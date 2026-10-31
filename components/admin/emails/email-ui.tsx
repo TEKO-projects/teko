@@ -4,6 +4,20 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
 export type Folder = "inbound" | "outbound" | "templates";
 
+/** "general" es el correo del CMS; "mine" es el correo institucional del usuario que inició sesión. */
+export type MailBox = "general" | "mine";
+
+export function mailPaths(box: MailBox) {
+  const base = box === "mine" ? "/admin/my-mailbox/messages" : "/admin/emails";
+  return {
+    list: (query: string) => `${base}?${query}`,
+    item: (id: number) => `${base}/${id}`,
+    read: (id: number) => `${base}/${id}/read`,
+    send: base,
+    preview: `${base}/preview`,
+  };
+}
+
 export function parseAddress(raw: string) {
   const match = raw.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
   if (match && match[1].trim()) return { name: match[1].trim(), email: match[2].trim() };

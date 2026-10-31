@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.mailbox import Mailbox, MailboxRequest
-from app.repositories import email_message_repository, mailbox_repository
+from app.repositories import admin_user_repository, email_message_repository, mailbox_repository
 from app.schemas.email_message import EmailMessageDetail, EmailMessageListItem, EmailPreviewRequest, EmailSendRequest
 from app.services.email_renderer import render_email
-from app.schemas.mailbox import MailboxCreate, MailboxRead, MailboxRequestRead, MailboxUpdate, OwnMailAccess, OwnMailbox, PlannerUser
+from app.schemas.mailbox import CmsUser, MailboxCreate, MailboxRead, MailboxRequestRead, MailboxUpdate, MyMailbox, OwnMailAccess, OwnMailbox, PlannerUser
 from app.services import admin_notification_service, email_service, planner_client
 from app.services.planner_client import PlannerError
 
@@ -30,17 +30,17 @@ def _read(mailbox: Mailbox, counts: dict[int, tuple[int, int]]) -> MailboxRead:
 
 # --- Aviso de correo habilitado ----------------------------------------------
 
-def _enabled_notice_template() -> SimpleNamespace:
+def _enabled_notice_template(*, kicker: str, button_label: str, button_url: str) -> SimpleNamespace:
     return SimpleNamespace(
         name="TEKO",
         logo_url="https://teko.do/email/teko-logo-white.png",
         header_background="#0a0e1a",
         accent_color="#0047ff",
         occasion="Correo institucional",
-        kicker="TEKO Planner",
+        kicker=kicker,
         headline="Tu correo institucional está *listo*.",
-        button_label="Abrir mi Bandeja",
-        button_url=f"{settings.PLANNER_APP_URL.rstrip('/')}/bandeja",
+        button_label=button_label,
+        button_url=button_url,
         signature="Equipo TEKO\nSanto Domingo, República Dominicana",
         signature_style="texto",
         signature_card=None,
@@ -58,11 +58,18 @@ def send_enabled_notice(db: Session, mailbox: Mailbox) -> bool:
     if not recipient or recipient.lower() == mailbox.address.lower() or not settings.RESEND_FROM_EMAIL:
         return False
     first_name = (mailbox.planner_user_name or mailbox.display_name).split()[0]
-    planner_url = settings.PLANNER_APP_URL.rstrip("/")
+    if mailbox.admin_user_id is not None:
+        url = f"{settings.CMS_APP_URL.rstrip('/')}"
+        where = f"Puedes ver los correos que recibas en la sección Correos del CMS de TEKO: {url}"
+        template = _enabled_notice_template(kicker="CMS de TEKO", button_label="Abrir Correos", button_url=url)
+    else:
+        url = f"{settings.PLANNER_APP_URL.rstrip('/')}/bandeja"
+        where = f"Puedes ver los correos que recibas en la Bandeja entrando a TEKO Planner: {url}"
+        template = _enabled_notice_template(kicker="TEKO Planner", button_label="Abrir mi Bandeja", button_url=url)
     body = (
         f"Hola {first_name},\n\n"
         f"Tu correo institucional **{mailbox.address}** fue habilitado con éxito.\n\n"
-        f"Puedes ver los correos que recibas en la Bandeja entrando a TEKO Planner: {planner_url}/bandeja\n\n"
+        f"{where}\n\n"
         "Desde ahí también puedes responder y escribir correos nuevos con tu dirección institucional."
     )
     try:
@@ -71,7 +78,7 @@ def send_enabled_notice(db: Session, mailbox: Mailbox) -> bool:
             payload=EmailSendRequest(to=[recipient], subject="Tu correo institucional fue habilitado", body=body),
             sender_address=settings.RESEND_FROM_EMAIL,
             sender_name=settings.RESEND_FROM_NAME,
-            template=_enabled_notice_template(),
+            template=template,
             reply_original=None,
             is_general=True,
             admin_id=None,
@@ -113,6 +120,14 @@ def planner_users(db: Session) -> list[PlannerUser]:
     return users
 
 
+def cms_users(db: Session) -> list[CmsUser]:
+    by_email = {mailbox.planner_user_email.lower(): mailbox.address for mailbox in mailbox_repository.list_all(db)}
+    return [
+        CmsUser(id=admin.id, name=admin.full_name, email=admin.email, role=admin.role, mailbox_address=by_email.get(admin.email.lower()))
+        for admin in admin_user_repository.list_active(db)
+    ]
+
+
 def create_mailbox(db: Session, payload: MailboxCreate) -> MailboxRead:
     domain = _require_domain()
     address = f"{payload.local_part.lower()}@{domain}"
@@ -121,21 +136,35 @@ def create_mailbox(db: Session, payload: MailboxCreate) -> MailboxRead:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esa es la dirección general del CMS")
     if mailbox_repository.get_by_address(db, address):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"{address} ya existe")
-    if mailbox_repository.get_by_planner_user(db, payload.planner_user_id):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ese empleado ya tiene un correo")
 
-    employee = next((user for user in planner_users(db) if user.id == payload.planner_user_id), None)
-    if not employee:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ese empleado no existe en el Planner")
+    if payload.admin_user_id is not None:
+        if mailbox_repository.get_by_admin_user(db, payload.admin_user_id):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ese usuario del CMS ya tiene un correo")
+        admin = admin_user_repository.get_by_id(db, payload.admin_user_id)
+        if not admin or not admin.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ese usuario no existe en el CMS o está desactivado")
+        # El login con el Planner crea usuarios del CMS con el mismo correo que su cuenta: una persona, un correo.
+        existing = mailbox_repository.get_by_owner_email(db, admin.email)
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"{admin.full_name} ya tiene el correo {existing.address}")
+        owner = {"admin_user_id": admin.id, "planner_user_name": admin.full_name, "planner_user_email": admin.email}
+    else:
+        if mailbox_repository.get_by_planner_user(db, payload.planner_user_id):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ese empleado ya tiene un correo")
+        employee = next((user for user in planner_users(db) if user.id == payload.planner_user_id), None)
+        if not employee:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ese empleado no existe en el Planner")
+        existing = mailbox_repository.get_by_owner_email(db, employee.email) if employee.email else None
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"{employee.name} ya tiene el correo {existing.address}")
+        owner = {"planner_user_id": employee.id, "planner_user_name": employee.name, "planner_user_email": employee.email}
 
     mailbox = Mailbox(
         address=address,
         display_name=payload.display_name.strip(),
         signature=payload.signature or None,
         is_active=True,
-        planner_user_id=employee.id,
-        planner_user_name=employee.name,
-        planner_user_email=employee.email,
+        **owner,
     )
     mailbox = mailbox_repository.save(db, mailbox)
     mailbox_repository.resolve_pending(db, mailbox.planner_user_id, "approved")
@@ -183,6 +212,28 @@ def dismiss_request(db: Session, request_id: int) -> MailboxRequestRead:
     mailbox_repository.resolve_pending(db, request.planner_user_id, "dismissed")
     db.refresh(request)
     return _request_read(db, request)
+
+
+# --- Correo del usuario del CMS ----------------------------------------------
+
+def admin_mailbox(db: Session, admin_user_id: int) -> Mailbox:
+    mailbox = mailbox_repository.get_by_admin_user(db, admin_user_id)
+    if not mailbox or not mailbox.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="mailbox_not_enabled")
+    return mailbox
+
+
+def admin_mailbox_summary(db: Session, admin_user_id: int) -> MyMailbox:
+    mailbox = mailbox_repository.get_by_admin_user(db, admin_user_id)
+    if not mailbox or not mailbox.is_active:
+        return MyMailbox(enabled=False)
+    return MyMailbox(
+        enabled=True,
+        address=mailbox.address,
+        display_name=mailbox.display_name,
+        signature=mailbox.signature,
+        unread=mailbox_repository.count_unread(db, mailbox.id),
+    )
 
 
 # --- Bandeja del empleado (Planner) -----------------------------------------

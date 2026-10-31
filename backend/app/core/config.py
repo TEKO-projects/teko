@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     PLANNER_BRIDGE_KEY: str = ""
     # Dirección pública del Planner; se enlaza en el aviso de correo habilitado.
     PLANNER_APP_URL: str = "https://tplanner.teko.do"
+    # Dirección del CMS; se enlaza en el aviso a usuarios del CMS.
+    CMS_APP_URL: str = "https://teko.do/admin"
 
     @property
     def MAIL_DOMAIN(self) -> str:
