@@ -20,10 +20,7 @@ def issue_token(admin: AdminUser, remember: bool = False) -> str:
     return create_access_token(subject=admin.email, minutes=REMEMBER_MINUTES if remember else None)
 
 
-def login(db: Session, email: str, password: str, remember: bool = False):
-    if planner_client.enabled():
-        return _login_via_planner(db, email, password, remember)
-
+def _login_local(db: Session, email: str, password: str, remember: bool):
     admin = admin_user_repository.get_by_email(db, email)
 
     if not admin:
@@ -38,12 +35,27 @@ def login(db: Session, email: str, password: str, remember: bool = False):
     return issue_token(admin, remember)
 
 
+def login(db: Session, email: str, password: str, remember: bool = False):
+    if planner_client.enabled():
+        return _login_via_planner(db, email, password, remember)
+
+    return _login_local(db, email, password, remember)
+
+
 def _login_via_planner(db: Session, email: str, password: str, remember: bool):
-    result, remote = planner_client.verify_login(email, password)
+    try:
+        result, remote = planner_client.verify_login(email, password)
+    except planner_client.PlannerError:
+        # Sin el Planner, igual entran los administradores creados aquí con contraseña propia.
+        token = _login_local(db, email, password, remember)
+        if token is None:
+            raise
+        return token
     if result == "forbidden":
         raise AccessDenied()
     if result != "ok":
-        return None
+        # Los administradores que se crean en el CMS tienen contraseña propia y no existen en el Planner.
+        return _login_local(db, email, password, remember)
 
     admin = admin_user_repository.get_by_email(db, remote["email"])
     if not admin:
