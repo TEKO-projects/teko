@@ -19,12 +19,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
+    """Upgrade schema. Idempotente: la API repara el esquema al arrancar si estaba atrasado."""
+    inspector = sa.inspect(op.get_bind())
+    columns = {column['name'] for column in inspector.get_columns('mailboxes')}
+    indexes = {index['name'] for index in inspector.get_indexes('mailboxes')}
     with op.batch_alter_table('mailboxes') as batch:
         batch.alter_column('planner_user_id', existing_type=sa.String(length=64), nullable=True)
-        batch.add_column(sa.Column('admin_user_id', sa.Integer(), nullable=True))
-        batch.create_foreign_key('fk_mailboxes_admin_user_id', 'admin_users', ['admin_user_id'], ['id'], ondelete='SET NULL')
-    op.create_index(op.f('ix_mailboxes_admin_user_id'), 'mailboxes', ['admin_user_id'], unique=True)
+        if 'admin_user_id' not in columns:
+            batch.add_column(sa.Column('admin_user_id', sa.Integer(), nullable=True))
+            batch.create_foreign_key('fk_mailboxes_admin_user_id', 'admin_users', ['admin_user_id'], ['id'], ondelete='SET NULL')
+    if 'ix_mailboxes_admin_user_id' not in indexes:
+        op.create_index(op.f('ix_mailboxes_admin_user_id'), 'mailboxes', ['admin_user_id'], unique=True)
 
 
 def downgrade() -> None:
