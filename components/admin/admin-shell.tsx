@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { AtSign, BarChart3, BriefcaseBusiness, CircleDollarSign, Eye, EyeOff, FileQuestion, Fingerprint, FolderKanban, LogOut, Mail, Menu, MessageSquareText, Search, Users, X } from "lucide-react";
+import { AtSign, BarChart3, BriefcaseBusiness, CircleDollarSign, Eye, EyeOff, FileQuestion, Fingerprint, FolderKanban, Lock, LogOut, Mail, Menu, MessageSquareText, Search, Trash2, Users, X } from "lucide-react";
 import { api, type AdminUser, type ContactRequest, type DashboardStats } from "@/lib/admin-api";
 import { useAdminAuth } from "./auth-provider";
 import { modules } from "./cms-config";
@@ -161,6 +161,9 @@ export function AdminShell() {
   );
 }
 
+// Entradas del login: borde y anillo de foco con clases, para que se vean igual con teclado, ratón y autocompletado.
+const loginInput = "h-12 w-full rounded-xl border border-white/10 bg-white/[0.04] text-[15px] text-[#f2f3f5] outline-none transition-[border-color,box-shadow] placeholder:text-[rgba(242,243,245,0.3)] hover:border-white/20 focus:border-[rgba(30,196,255,0.6)] focus:shadow-[0_0_0_3px_rgba(30,196,255,0.14)] disabled:opacity-60 aria-[invalid=true]:border-[rgba(248,113,113,0.5)] [&:-webkit-autofill]:[-webkit-text-fill-color:#f2f3f5] [&:-webkit-autofill]:shadow-[inset_0_0_0_100px_#11151d]";
+
 function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: string, remember: boolean) => Promise<void>; onPasskey: (remember: boolean) => Promise<void> }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -168,6 +171,7 @@ function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: stri
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const passkeysSupported = usePasskeysSupported();
 
   const passkey = async () => {
@@ -207,7 +211,7 @@ function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: stri
           }}
         >
           <Image src="/LogoTeko.png" width={120} height={40} alt="TEKO" className="mb-10 h-10 w-auto" />
-          <p className="text-sm font-medium" style={{ color: "#1ec4ff" }}>Administracion</p>
+          <p className="text-sm font-medium" style={{ color: "#1ec4ff" }}>Administración</p>
           <h2 className="mt-1 text-3xl font-bold">Bienvenido de vuelta</h2>
           <p className="mt-2 text-sm" style={{ color: "rgba(242,243,245,0.5)" }}>Ingresa con tu cuenta administrativa.</p>
 
@@ -217,51 +221,70 @@ function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: stri
             </p>
           )}
 
-          <label className="mt-8 block text-sm font-medium">
-            Correo
-            <input
-              required
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 w-full rounded-xl border px-4 py-3 outline-none transition-all"
-              style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#f2f3f5" }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(30,196,255,0.5)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(30,196,255,0.1)"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.boxShadow = "none"; }}
-            />
-          </label>
-
-          <label className="mt-4 block text-sm font-medium">
-            Contrasena
-            <div className="relative mt-2">
+          <div className="mt-8">
+            <label htmlFor="login-email" className="mb-2 block text-sm font-medium">Correo</label>
+            <div className="group relative">
+              <Mail size={17} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[rgba(242,243,245,0.35)] transition-colors group-focus-within:text-[#1ec4ff]" />
               <input
+                id="login-email"
+                required
+                type="email"
+                name="email"
+                inputMode="email"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoFocus
+                disabled={busy}
+                placeholder="nombre@teko.do"
+                aria-invalid={Boolean(error) || undefined}
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                className={loginInput + " pl-11 pr-4"}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label htmlFor="login-password" className="mb-2 block text-sm font-medium">Contraseña</label>
+            <div className="group relative">
+              <Lock size={17} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[rgba(242,243,245,0.35)] transition-colors group-focus-within:text-[#1ec4ff]" />
+              <input
+                id="login-password"
                 required
                 minLength={8}
                 type={showPassword ? "text" : "password"}
+                name="password"
                 autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                disabled={busy}
+                placeholder="Tu contraseña"
+                aria-invalid={Boolean(error) || undefined}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border py-3 pl-4 pr-12 outline-none transition-all"
-                style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#f2f3f5" }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(30,196,255,0.5)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(30,196,255,0.1)"; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.boxShadow = "none"; }}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
+                onBlur={() => setCapsLock(false)}
+                className={loginInput + " pl-11 pr-12"}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
-                aria-label={showPassword ? "Ocultar contrasena" : "Ver contrasena"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
-                style={{ color: "rgba(242,243,245,0.5)" }}
+                aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                aria-pressed={showPassword}
+                className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] transition-colors hover:bg-white/5 hover:text-[#f2f3f5] focus-visible:outline-2 focus-visible:outline-[#1ec4ff]"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-          </label>
+            {capsLock && <p role="status" className="mt-2 text-xs" style={{ color: "#fbbf24" }}>Tienes las mayúsculas activadas.</p>}
+          </div>
 
           <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm" style={{ color: "rgba(242,243,245,0.7)" }}>
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-[#1ec4ff]" />
-            Mantener sesion iniciada
+            Mantener sesión iniciada
           </label>
 
           <button
@@ -269,7 +292,7 @@ function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: stri
             className="mt-7 w-full rounded-xl py-3 font-semibold transition-all hover:brightness-110 disabled:opacity-60"
             style={{ background: "#1ec4ff", color: "#080a0f", boxShadow: "0 8px 24px -6px rgba(30,196,255,0.45)" }}
           >
-            {busy ? "Verificando..." : "Iniciar sesion"}
+            {busy ? "Verificando..." : "Iniciar sesión"}
           </button>
 
           {passkeysSupported && (
@@ -488,6 +511,7 @@ function Admins({ current }: { current: AdminUser }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [confirmId, setConfirmId] = useState<number | null>(null);
 
   const load = useCallback(() => api<AdminUser[]>("/admin/admin-users").then(setItems).catch((e: Error) => setError(e.message)), []);
   useEffect(() => { Promise.resolve().then(load); }, [load]);
@@ -502,6 +526,19 @@ function Admins({ current }: { current: AdminUser }) {
       setSuccess("Estado del administrador actualizado.");
       load();
     } catch (e) { setError((e as Error).message); } finally { setBusyId(null); }
+  };
+
+  const remove = async (item: AdminUser) => {
+    if (busyId !== null) return;
+    setBusyId(item.id);
+    setError("");
+    setSuccess("");
+    try {
+      await api(`/admin/admin-users/${item.id}`, { method: "DELETE" });
+      setSuccess(`${item.full_name} fue eliminado.`);
+      setConfirmId(null);
+      load();
+    } catch (e) { setError((e as Error).message); setConfirmId(null); } finally { setBusyId(null); }
   };
 
   return (
@@ -535,14 +572,38 @@ function Admins({ current }: { current: AdminUser }) {
               </p>
               <p className="text-sm" style={{ color: "rgba(242,243,245,0.5)" }}>{item.email} · {item.role}</p>
             </div>
-            <button
-              disabled={item.id === current.id || busyId !== null}
-              onClick={() => toggle(item)}
-              className="rounded-lg border px-3 py-1.5 text-xs disabled:opacity-40"
-              style={{ borderColor: "rgba(255,255,255,0.1)", color: "rgba(242,243,245,0.7)" }}
-            >
-              {busyId === item.id ? "Guardando..." : item.is_active ? "Desactivar" : "Activar"}
-            </button>
+            <div className="flex items-center gap-2">
+              {confirmId === item.id ? (
+                <span className="flex items-center gap-2 text-xs" style={{ color: "rgba(242,243,245,0.7)" }}>
+                  ¿Eliminar a {item.full_name}?
+                  <button disabled={busyId !== null} onClick={() => remove(item)} className="rounded-lg px-3 py-1.5 font-semibold disabled:opacity-60" style={{ background: "rgba(248,113,113,0.14)", color: "#f87171" }}>
+                    {busyId === item.id ? "Eliminando..." : "Sí, eliminar"}
+                  </button>
+                  <button onClick={() => setConfirmId(null)} className="rounded-lg px-2 py-1.5 hover:bg-white/5">No</button>
+                </span>
+              ) : (
+                <>
+                  <button
+                    disabled={item.id === current.id || busyId !== null}
+                    onClick={() => toggle(item)}
+                    className="rounded-lg border px-3 py-1.5 text-xs disabled:opacity-40"
+                    style={{ borderColor: "rgba(255,255,255,0.1)", color: "rgba(242,243,245,0.7)" }}
+                  >
+                    {busyId === item.id ? "Guardando..." : item.is_active ? "Desactivar" : "Activar"}
+                  </button>
+                  <button
+                    disabled={item.id === current.id || busyId !== null}
+                    onClick={() => { setError(""); setSuccess(""); setConfirmId(item.id); }}
+                    aria-label={`Eliminar a ${item.full_name}`}
+                    title={item.id === current.id ? "No puedes eliminar tu propia cuenta" : "Eliminar administrador"}
+                    className="grid h-8 w-8 place-items-center rounded-lg border transition-colors hover:bg-[rgba(248,113,113,0.12)] hover:text-[#f87171] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-inherit"
+                    style={{ borderColor: "rgba(255,255,255,0.1)", color: "rgba(242,243,245,0.7)" }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         ))}
       </div>

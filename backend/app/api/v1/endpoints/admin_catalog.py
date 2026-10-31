@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -71,6 +71,12 @@ def list_admins(db: Session = Depends(get_db)):
 @router.post("/admin-users", response_model=AdminUserRead, status_code=201)
 def create_admin(payload: AdminUserCreate, db: Session = Depends(get_db)):
     return service.create_admin(db, payload)
+
+
+@router.delete("/admin-users/{admin_id}", status_code=204)
+def delete_admin(admin_id: int, db: Session = Depends(get_db), current_admin: AdminUser = Depends(get_current_admin)):
+    service.delete_admin(db, admin_id, current_admin)
+    return Response(status_code=204)
 
 
 @router.patch("/admin-users/{admin_id}/status", response_model=AdminUserRead)

@@ -3,6 +3,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.admin_user import AdminUser
+from app.models.email_message import EmailMessage
+from app.models.mailbox import Mailbox
 from app.models.plan import Plan
 from app.models.portfolio import PortfolioCategory, PortfolioProject
 from app.models.service import Service, ServiceCategory
@@ -93,3 +95,19 @@ def update_admin_status(db: Session, admin_id: int, is_active: bool, current_adm
     if not is_active and admin.is_active and repository.active_admin_count(db) <= 1:
         raise HTTPException(status_code=409, detail="Debe quedar al menos un administrador activo")
     return repository.update_entity(db, admin, {"is_active": is_active})
+
+
+def delete_admin(db: Session, admin_id: int, current_admin: AdminUser) -> None:
+    admin = repository.get_entity(db, AdminUser, admin_id)
+    if not admin:
+        _not_found("Administrador")
+    if admin.id == current_admin.id:
+        raise HTTPException(status_code=409, detail="No puedes eliminar tu propia cuenta")
+    if admin.is_active and repository.active_admin_count(db) <= 1:
+        raise HTTPException(status_code=409, detail="Debe quedar al menos un administrador activo")
+
+    # Sus correos enviados se conservan; su buzón queda deshabilitado y sin dueño (lo que llegue vuelve a Correos del CMS).
+    db.query(EmailMessage).filter(EmailMessage.sent_by_admin_id == admin.id).update({"sent_by_admin_id": None}, synchronize_session=False)
+    db.query(Mailbox).filter(Mailbox.admin_user_id == admin.id).update({"admin_user_id": None, "is_active": False}, synchronize_session=False)
+    # Passkeys y avisos leídos se eliminan en cascada.
+    _commit(db, lambda: (db.delete(admin), db.commit()))
