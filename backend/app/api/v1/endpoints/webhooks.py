@@ -69,5 +69,12 @@ async def receive_resend_webhook(
         # Solo llega aquí una llamada con firma válida (Resend): el detalle ayuda a diagnosticar desde su panel.
         return JSONResponse(status_code=500, content={"success": False, "detail": f"{type(error).__name__}: {str(error)[:300]}"})
     inbound_monitor.record(result, event=event.get("type"))
+    if result == "duplicate":
+        # Al reenviar un evento ya guardado, se responde cómo quedó enlazado (solo lo ve Resend).
+        data = event.get("data") or {}
+        try:
+            return {"success": True, "result": result, "debug": email_service.describe_stored(db, data.get("email_id") or data.get("id"))}
+        except Exception as error:  # noqa: BLE001
+            return {"success": True, "result": result, "debug_error": f"{type(error).__name__}: {str(error)[:200]}"}
 
     return {"success": True, "result": result}
