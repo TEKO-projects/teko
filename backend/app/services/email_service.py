@@ -1,3 +1,4 @@
+import logging
 from types import SimpleNamespace
 
 from fastapi import HTTPException, status
@@ -12,6 +13,8 @@ from app.schemas.email_message import EmailMessageDetail, EmailMessageListItem, 
 from app.services.email_renderer import render_email
 from app.services import resend_client
 from app.services.resend_client import ResendError
+
+logger = logging.getLogger(__name__)
 
 
 STATUS_BY_EVENT = {
@@ -201,6 +204,15 @@ def handle_webhook_event(db: Session, event: dict) -> str:
     return "updated"
 
 
+def _db_text(value: str | None, limit: int | None = None) -> str | None:
+    """PostgreSQL no admite el carácter nulo en texto ni valores más largos que la columna
+    (SQLite sí los deja pasar). Un correo real con cualquiera de los dos no debe perderse."""
+    if value is None:
+        return None
+    value = str(value).replace("\x00", "")
+    return value[:limit] if limit else value
+
+
 def _store_received_email(db: Session, data: dict) -> str:
     provider_id = data.get("email_id") or data.get("id")
 
@@ -213,26 +225,27 @@ def _store_received_email(db: Session, data: dict) -> str:
     if provider_id:
         try:
             content = resend_client.get_received_email(provider_id)
-        except ResendError as error:
+        except Exception as error:  # noqa: BLE001 - ResendError, tiempo agotado, respuesta que no es JSON...
             # El correo llegó: se guarda con los metadatos aunque falte el cuerpo.
+            logger.warning("No se pudo descargar el correo recibido %s: %s", provider_id, error)
             fetch_error = f"No fue posible descargar el contenido: {error}"
 
     attachments = content.get("attachments") or data.get("attachments") or []
 
     message = EmailMessage(
         direction="inbound",
-        provider_id=provider_id,
-        message_id=content.get("message_id") or data.get("message_id"),
-        from_email=_join_addresses(content.get("from") or data.get("from")) or "desconocido",
-        to_email=_join_addresses(content.get("to") or data.get("to")),
-        cc=_join_addresses(content.get("cc") or data.get("cc")) or None,
-        bcc=_join_addresses(content.get("bcc") or data.get("bcc")) or None,
-        reply_to=_join_addresses(content.get("reply_to")) or None,
-        subject=content.get("subject") or data.get("subject"),
-        text_body=content.get("text"),
-        html_body=content.get("html"),
+        provider_id=_db_text(provider_id, 100),
+        message_id=_db_text(content.get("message_id") or data.get("message_id"), 500),
+        from_email=_db_text(_join_addresses(content.get("from") or data.get("from")), 320) or "desconocido",
+        to_email=_db_text(_join_addresses(content.get("to") or data.get("to"))) or "",
+        cc=_db_text(_join_addresses(content.get("cc") or data.get("cc"))) or None,
+        bcc=_db_text(_join_addresses(content.get("bcc") or data.get("bcc"))) or None,
+        reply_to=_db_text(_join_addresses(content.get("reply_to")), 320) or None,
+        subject=_db_text(content.get("subject") or data.get("subject"), 500),
+        text_body=_db_text(content.get("text")),
+        html_body=_db_text(content.get("html")),
         status="received",
-        error_message=fetch_error,
+        error_message=_db_text(fetch_error),
         is_read=False,
         has_attachments=bool(attachments),
     )
@@ -248,7 +261,11 @@ def _store_received_email(db: Session, data: dict) -> str:
 
     email_message_repository.create(db, message)
     for mailbox in owners:
-        mailbox_repository.link_message(db, mailbox.id, message.id, is_read=False)
+        try:
+            mailbox_repository.link_message(db, mailbox.id, message.id, is_read=False)
+        except Exception:  # noqa: BLE001 - el correo ya está guardado; al arrancar se enlaza solo
+            db.rollback()
+            logger.exception("No se pudo enlazar el correo %s al buzón %s", message.id, mailbox.id)
     return "received"
 
 

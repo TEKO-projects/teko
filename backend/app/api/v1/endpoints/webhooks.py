@@ -2,6 +2,7 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -64,7 +65,9 @@ async def receive_resend_webhook(
     except Exception as error:  # noqa: BLE001 - se registra y se deja que el framework responda 500
         inbound_monitor.record("error", event=event.get("type"), detail=str(error)[:200])
         logger.exception("Falló el procesamiento del webhook de Resend")
-        raise
+        db.rollback()
+        # Solo llega aquí una llamada con firma válida (Resend): el detalle ayuda a diagnosticar desde su panel.
+        return JSONResponse(status_code=500, content={"success": False, "detail": f"{type(error).__name__}: {str(error)[:300]}"})
     inbound_monitor.record(result, event=event.get("type"))
 
     return {"success": True, "result": result}
