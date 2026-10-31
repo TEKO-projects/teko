@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { AtSign, BarChart3, BriefcaseBusiness, CircleDollarSign, Eye, EyeOff, FileQuestion, Fingerprint, FolderKanban, Lock, LogOut, Mail, Menu, MessageSquareText, Search, Trash2, Users, X } from "lucide-react";
+import { AtSign, BarChart3, BriefcaseBusiness, Check, CircleDollarSign, Copy, Eye, EyeOff, FileQuestion, Fingerprint, FolderKanban, Lock, LogOut, Mail, Menu, MessageSquareText, Search, ShieldCheck, Trash2, Users, Wand2, X } from "lucide-react";
 import { api, type AdminUser, type ContactRequest, type DashboardStats } from "@/lib/admin-api";
 import { useAdminAuth } from "./auth-provider";
 import { modules } from "./cms-config";
@@ -162,7 +162,7 @@ export function AdminShell() {
 }
 
 // Entradas del login: borde y anillo de foco con clases, para que se vean igual con teclado, ratón y autocompletado.
-const loginInput = "h-12 w-full rounded-xl border border-white/10 bg-white/[0.04] text-[15px] text-[#f2f3f5] outline-none transition-[border-color,box-shadow] placeholder:text-[rgba(242,243,245,0.3)] hover:border-white/20 focus:border-[rgba(30,196,255,0.6)] focus:shadow-[0_0_0_3px_rgba(30,196,255,0.14)] disabled:opacity-60 aria-[invalid=true]:border-[rgba(248,113,113,0.5)] [&:-webkit-autofill]:[-webkit-text-fill-color:#f2f3f5] [&:-webkit-autofill]:shadow-[inset_0_0_0_100px_#11151d]";
+const loginInput = "h-12 w-full rounded-xl border border-white/10 bg-white/[0.04] text-[15px] text-[#f2f3f5] outline-none transition-[border-color,box-shadow] placeholder:text-[rgba(242,243,245,0.3)] hover:border-white/20 focus:border-[rgba(30,196,255,0.6)] focus:bg-white/[0.06] disabled:opacity-60 aria-[invalid=true]:border-[rgba(248,113,113,0.5)] [&:-webkit-autofill]:[-webkit-text-fill-color:#f2f3f5] [&:-webkit-autofill]:shadow-[inset_0_0_0_100px_#11151d]";
 
 function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: string, remember: boolean) => Promise<void>; onPasskey: (remember: boolean) => Promise<void> }) {
   const [email, setEmail] = useState("");
@@ -282,8 +282,8 @@ function Login({ onLogin, onPasskey }: { onLogin: (email: string, password: stri
             {capsLock && <p role="status" className="mt-2 text-xs" style={{ color: "#fbbf24" }}>Tienes las mayúsculas activadas.</p>}
           </div>
 
-          <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm" style={{ color: "rgba(242,243,245,0.7)" }}>
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-[#1ec4ff]" />
+          <label className="mt-4 flex w-fit cursor-pointer items-center gap-2.5 text-sm" style={{ color: "rgba(242,243,245,0.7)" }}>
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="tk-check" />
             Mantener sesión iniciada
           </label>
 
@@ -612,56 +612,136 @@ function Admins({ current }: { current: AdminUser }) {
   );
 }
 
+const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*?";
+
+/** Contraseña aleatoria de 16 caracteres, sin los que se confunden (0/O, 1/l/I). */
+function generatePassword(length = 16) {
+  const limit = 256 - (256 % PASSWORD_CHARS.length);
+  const out: string[] = [];
+  while (out.length < length) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(length * 2))) {
+      if (byte < limit && out.length < length) out.push(PASSWORD_CHARS[byte % PASSWORD_CHARS.length]);
+    }
+  }
+  return out.join("");
+}
+
 function AdminForm({ close, saved }: { close: () => void; saved: () => void }) {
-  const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "admin" });
+  const [form, setForm] = useState({ full_name: "", email: "", password: "", confirm: "" });
+  const [show, setShow] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const set = (patch: Partial<typeof form>) => { setForm((old) => ({ ...old, ...patch })); setError(""); };
+  const mismatch = form.confirm.length > 0 && form.confirm !== form.password;
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [close]);
+
+  const generate = () => {
+    const password = generatePassword();
+    set({ password, confirm: password });
+    setShow(true);
+    setCopied(false);
+  };
+
+  const copy = () => {
+    navigator.clipboard.writeText(form.password).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1800); }).catch(() => setError("No se pudo copiar. Selecciónala y cópiala a mano."));
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
+    if (form.password !== form.confirm) { setError("Las contraseñas no coinciden."); return; }
     setSaving(true);
     setError("");
-    try { await api("/admin/admin-users", { method: "POST", body: JSON.stringify(form) }); saved(); } catch (err) { setError((err as Error).message); } finally { setSaving(false); }
+    try {
+      await api("/admin/admin-users", { method: "POST", body: JSON.stringify({ full_name: form.full_name.trim(), email: form.email.trim(), password: form.password, role: "admin" }) });
+      saved();
+    } catch (err) { setError((err as Error).message); } finally { setSaving(false); }
   };
 
+  const eye = (
+    <button
+      type="button"
+      onClick={() => setShow((value) => !value)}
+      aria-label={show ? "Ocultar contraseña" : "Ver contraseña"}
+      aria-pressed={show}
+      className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] transition-colors hover:bg-white/5 hover:text-[#f2f3f5]"
+    >
+      {show ? <EyeOff size={17} /> : <Eye size={17} />}
+    </button>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
       <form
         onSubmit={submit}
-        className="w-full max-w-md rounded-2xl border p-6"
-        style={{
-          borderColor: "rgba(255,255,255,0.1)",
-          background: "#0d1017",
-          color: "#f2f3f5",
-        }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-admin-title"
+        className="tk-modal w-full max-w-md rounded-2xl border border-white/10 bg-[#0d1017] p-6 text-[#f2f3f5] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]"
       >
-        <div className="flex justify-between">
-          <h2 className="text-xl font-bold">Nuevo administrador</h2>
-          <button type="button" onClick={close} style={{ color: "rgba(242,243,245,0.5)" }}><X /></button>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#1ec4ff]">Acceso al CMS</p>
+            <h2 id="new-admin-title" className="mt-0.5 text-xl font-bold">Nuevo administrador</h2>
+          </div>
+          <button type="button" onClick={close} aria-label="Cerrar" className="grid h-8 w-8 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] transition-colors hover:bg-white/[0.06] hover:text-[#f2f3f5]"><X size={18} /></button>
         </div>
-        {error && <p className="mt-4 text-sm" style={{ color: "#f87171" }}>{error}</p>}
-        {Object.entries(form).map(([key, value]) => (
-          <label key={key} className="mt-4 block text-sm capitalize">
-            {key.replace("_", " ")}
-            <input
-              required
-              type={key === "password" ? "password" : key === "email" ? "email" : "text"}
-              minLength={key === "password" ? 8 : undefined}
-              value={value}
-              onChange={(e) => setForm((old) => ({ ...old, [key]: e.target.value }))}
-              className="mt-1 w-full rounded-xl border px-3 py-2.5"
-              style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#f2f3f5" }}
-            />
-          </label>
-        ))}
-        <button
-          disabled={saving}
-          className="mt-6 w-full rounded-xl py-3 font-semibold transition-all hover:brightness-110 disabled:opacity-60"
-          style={{ background: "#1ec4ff", color: "#080a0f" }}
-        >
-          {saving ? "Creando..." : "Crear administrador"}
-        </button>
+
+        {error && <p role="alert" className="mt-4 rounded-xl border border-[rgba(248,113,113,0.25)] bg-[rgba(248,113,113,0.1)] p-3 text-sm text-[#f87171]">{error}</p>}
+
+        <div className="mt-5 space-y-4">
+          <div>
+            <label htmlFor="admin-name" className="mb-1.5 block text-sm font-medium">Nombre completo</label>
+            <input id="admin-name" required minLength={2} maxLength={150} autoFocus autoComplete="off" placeholder="Ana Pérez" value={form.full_name} onChange={(e) => set({ full_name: e.target.value })} className="tk-input" />
+          </div>
+          <div>
+            <label htmlFor="admin-email" className="mb-1.5 block text-sm font-medium">Correo</label>
+            <input id="admin-email" required type="email" inputMode="email" autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="nombre@teko.do" value={form.email} onChange={(e) => set({ email: e.target.value })} className="tk-input" />
+          </div>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <label htmlFor="admin-password" className="text-sm font-medium">Contraseña</label>
+              <button type="button" onClick={generate} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-[#1ec4ff] transition-colors hover:bg-[rgba(30,196,255,0.1)]">
+                <Wand2 size={13} />Generar
+              </button>
+            </div>
+            <div className="relative">
+              <input id="admin-password" required minLength={8} maxLength={128} type={show ? "text" : "password"} autoComplete="new-password" autoCapitalize="none" spellCheck={false} placeholder="Mínimo 8 caracteres" value={form.password} onChange={(e) => set({ password: e.target.value })} className={`tk-input ${show && form.password ? "pr-20 font-mono" : "pr-11"}`} />
+              {show && form.password && (
+                <button type="button" onClick={copy} aria-label="Copiar contraseña" className="absolute right-10 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-[rgba(242,243,245,0.5)] transition-colors hover:bg-white/5 hover:text-[#f2f3f5]">
+                  {copied ? <Check size={16} className="text-[#4ade80]" /> : <Copy size={16} />}
+                </button>
+              )}
+              {eye}
+            </div>
+          </div>
+          <div>
+            <label htmlFor="admin-confirm" className="mb-1.5 block text-sm font-medium">Confirmar contraseña</label>
+            <div className="relative">
+              <input id="admin-confirm" required type={show ? "text" : "password"} autoComplete="new-password" autoCapitalize="none" spellCheck={false} placeholder="Repite la contraseña" aria-invalid={mismatch || undefined} value={form.confirm} onChange={(e) => set({ confirm: e.target.value })} className={`tk-input pr-11 ${show ? "font-mono" : ""}`} />
+              {eye}
+            </div>
+            {mismatch && <p className="mt-1.5 text-xs text-[#f87171]">Las contraseñas no coinciden.</p>}
+          </div>
+        </div>
+
+        <p className="mt-5 flex items-center gap-2 rounded-xl bg-white/[0.03] px-3 py-2.5 text-[13px] text-[rgba(242,243,245,0.55)]">
+          <ShieldCheck size={15} className="shrink-0 text-[#1ec4ff]" />
+          Tendrá acceso completo al CMS como administrador.
+        </p>
+
+        <div className="mt-6 flex gap-3">
+          <button type="button" onClick={close} className="h-11 rounded-xl border border-white/10 px-4 text-sm text-[rgba(242,243,245,0.7)] transition-colors hover:bg-white/5">Cancelar</button>
+          <button disabled={saving || mismatch} className="h-11 flex-1 rounded-xl bg-[#1ec4ff] font-semibold text-[#080a0f] transition-all hover:brightness-110 disabled:opacity-60">
+            {saving ? "Creando..." : "Crear administrador"}
+          </button>
+        </div>
       </form>
     </div>
   );
