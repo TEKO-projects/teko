@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Pencil, Plus, Search, X } from "lucide-react";
+import { Pencil, Plus, Search, X } from "lucide-react";
 import { api, type AdminRecord, type RecordValue } from "@/lib/admin-api";
 import type { Field, ModuleConfig } from "./cms-config";
 
@@ -161,15 +161,10 @@ function RecordDialog({ config, record, onClose, onSaved }: { config: ModuleConf
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }} role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <form
         onSubmit={submit}
-        className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border p-6 shadow-2xl"
-        style={{
-          borderColor: "rgba(255,255,255,0.1)",
-          background: "#0d1017",
-          color: "#f2f3f5",
-        }}
+        className="tk-modal max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-[#0d1017] p-6 text-[#f2f3f5] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]"
       >
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -221,14 +216,13 @@ function RecordDialog({ config, record, onClose, onSaved }: { config: ModuleConf
 }
 
 function FieldInput({ field, value, options, onChange }: { field: Field; value: RecordValue; options?: Array<{ value: string; label: string }>; onChange: (value: RecordValue) => void }) {
-  const cls = "mt-1 w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all";
-  const style: React.CSSProperties = { borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#f2f3f5" };
+  const cls = "tk-input mt-1";
+  const style: React.CSSProperties | undefined = undefined;
 
   if (field.type === "checkbox") {
     return (
-      <label className="flex items-center gap-3 self-end rounded-xl border p-3 text-sm" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-        <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
-        <Check size={15} />
+      <label className="flex cursor-pointer items-center gap-3 self-end rounded-xl border border-white/10 p-3 text-sm transition-colors hover:border-white/20">
+        <input type="checkbox" className="tk-check" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />
         {field.label}
       </label>
     );
