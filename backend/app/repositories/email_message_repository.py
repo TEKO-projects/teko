@@ -19,6 +19,10 @@ def get_by_provider_id(db: Session, provider_id: str) -> EmailMessage | None:
     return db.query(EmailMessage).filter(EmailMessage.provider_id == provider_id).first()
 
 
+def get_inbound_by_provider_id(db: Session, provider_id: str) -> EmailMessage | None:
+    return db.query(EmailMessage).filter(EmailMessage.provider_id == provider_id, EmailMessage.direction == "inbound").first()
+
+
 def list_messages(
     db: Session,
     *,
