@@ -23,6 +23,7 @@ export default function SectionStats() {
         const numberEl = item.querySelector(".stat-number");
         const target = parseInt(numberEl?.getAttribute("data-value") || "0", 10);
         const obj = { val: 0 };
+        if (numberEl) numberEl.textContent = "0";
 
         gsap.from(item, {
           y: 30,
@@ -74,7 +75,7 @@ export default function SectionStats() {
             >
               <div className="mb-2 text-[44px] font-extrabold leading-none tracking-tight md:text-[56px]" style={{ color: "#1ec4ff" }}>
                 <span className="stat-number" data-value={s.value}>
-                  0
+                  {s.value}
                 </span>
                 {s.suffix}
               </div>

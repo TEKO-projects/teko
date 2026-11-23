@@ -7,6 +7,12 @@
 - Diseño UX/UI, identidad visual, landing pages y pitch decks
 - Infraestructura cloud, servidores, hosting, microservicios, mantenimiento y soporte
 
+## Soluciones
+- [Desarrollo de software a medida en República Dominicana](https://www.teko.do/soluciones/desarrollo-de-software-a-medida-republica-dominicana)
+- [Desarrollo de aplicaciones móviles en República Dominicana](https://www.teko.do/soluciones/desarrollo-de-aplicaciones-moviles-republica-dominicana)
+- [Diseño y desarrollo de páginas web en República Dominicana](https://www.teko.do/soluciones/diseno-de-paginas-web-republica-dominicana)
+- [Integraciones, APIs y automatización con WhatsApp](https://www.teko.do/soluciones/integraciones-apis-automatizacion-whatsapp)
+
 ## Páginas clave
 - [Servicios](https://www.teko.do/servicios): catálogo completo de servicios
 - [Planes y precios](https://www.teko.do/precios): planes y preguntas frecuentes
@@ -14,3 +20,6 @@
 - [Plataformas](https://www.teko.do/plataformas): TEKO Social Manager y Rapidito
 - [Sobre TEKO](https://www.teko.do/nosotros): equipo y forma de trabajo
 - [Contacto](https://www.teko.do/contacto): cotizaciones y citas sin compromiso (info@teko.do, +1 849 246 4987)
+
+## Fundador
+- John Marte, Founder & Tech Lead

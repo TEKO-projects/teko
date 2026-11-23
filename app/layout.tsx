@@ -71,6 +71,9 @@ const jsonLd = {
       logo: "https://www.teko.do/LogoTeko.png",
       email: "info@teko.do",
       telephone: "+1-849-246-4987",
+      address: { "@type": "PostalAddress", addressCountry: "DO" },
+      founder: { "@type": "Person", name: "John Marte", jobTitle: "Founder & Tech Lead" },
+      contactPoint: { "@type": "ContactPoint", contactType: "sales", telephone: "+1-849-246-4987", email: "info@teko.do", availableLanguage: ["es", "en"] },
       slogan: "Software que transforma negocios",
       description:
         "Agencia de desarrollo de software y transformación digital en República Dominicana: plataformas web, apps móviles, sistemas empresariales y APIs a medida.",

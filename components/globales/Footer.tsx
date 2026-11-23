@@ -8,11 +8,11 @@ const FOOTER_LINKS = [
   {
     title: "SERVICIOS",
     links: [
-      { label: "Desarrollo web a medida", href: "/servicios" },
-      { label: "Aplicaciones móviles", href: "/servicios" },
-      { label: "Diseño UX/UI y branding", href: "/servicios" },
-      { label: "APIs e integraciones", href: "/servicios" },
-      { label: "Cloud y hosting", href: "/servicios" },
+      { label: "Software a medida", href: "/soluciones/desarrollo-de-software-a-medida-republica-dominicana" },
+      { label: "Aplicaciones móviles", href: "/soluciones/desarrollo-de-aplicaciones-moviles-republica-dominicana" },
+      { label: "Páginas web", href: "/soluciones/diseno-de-paginas-web-republica-dominicana" },
+      { label: "Integraciones y automatización", href: "/soluciones/integraciones-apis-automatizacion-whatsapp" },
+      { label: "Todos los servicios", href: "/servicios" },
     ],
   },
   {
