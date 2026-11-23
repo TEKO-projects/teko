@@ -2,53 +2,49 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { FaInstagram, FaLinkedinIn, FaYoutube } from "react-icons/fa";
+import { FaInstagram } from "react-icons/fa";
 
 const FOOTER_LINKS = [
   {
-    title: "PRODUCTOS",
+    title: "SERVICIOS",
     links: [
-      { label: "Plataformas Web", href: "/plataformas" },
-      { label: "Apps Móviles", href: "/portafolio" },
-      { label: "Sistemas", href: "/servicios" },
-      { label: "API & Backend", href: "/servicios" },
-      { label: "Integraciones", href: "/servicios" },
+      { label: "Desarrollo web a medida", href: "/servicios" },
+      { label: "Aplicaciones móviles", href: "/servicios" },
+      { label: "Diseño UX/UI y branding", href: "/servicios" },
+      { label: "APIs e integraciones", href: "/servicios" },
+      { label: "Cloud y hosting", href: "/servicios" },
     ],
   },
   {
     title: "EMPRESA",
     links: [
-      { label: "CRM", href: "/portafolio" },
-      { label: "Pagos", href: "/precios" },
-      { label: "Funciones", href: "/" },
-      { label: "Características", href: "/servicios" },
-      { label: "Blog", href: "/" },
+      { label: "Sobre TEKO", href: "/nosotros" },
+      { label: "Portafolio", href: "/portafolio" },
+      { label: "Plataformas", href: "/plataformas" },
+      { label: "Planes y precios", href: "/precios" },
     ],
   },
   {
     title: "RECURSOS",
     links: [
-      { label: "Centro de Ayuda", href: "/contacto" },
-      { label: "Demo", href: "/" },
-      { label: "Estado del Servidor", href: "/" },
-      { label: "Partners", href: "/" },
+      { label: "Preguntas frecuentes", href: "/precios" },
+      { label: "Política de privacidad", href: "/politica-de-privacidad" },
+      { label: "Términos y condiciones", href: "/terminos-y-condiciones" },
     ],
   },
   {
-    title: "NOSOTROS",
+    title: "CONTACTO",
     links: [
-      { label: "Sobre TEKO", href: "/nosotros" },
-      { label: "Contacto", href: "/contacto" },
-      { label: "Carreras", href: "/nosotros" },
-      { label: "Prensa", href: "/" },
+      { label: "Solicita una cotización", href: "/contacto" },
+      { label: "info@teko.do", href: "mailto:info@teko.do" },
+      { label: "+1 849 246 4987", href: "tel:+18492464987" },
     ],
   },
 ];
 
+// shortcut: LinkedIn y YouTube quitados porque apuntaban a "#"; volver a añadirlos cuando existan los perfiles.
 const SOCIAL_LINKS = [
   { label: "Instagram", href: "https://www.instagram.com/teko.dr/", icon: FaInstagram },
-  { label: "LinkedIn", href: "#", icon: FaLinkedinIn },
-  { label: "YouTube", href: "#", icon: FaYoutube },
 ];
 
 export default function Footer() {

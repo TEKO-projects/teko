@@ -1,0 +1,16 @@
+# TEKO
+
+> TEKO es una agencia de desarrollo de software y transformación digital en República Dominicana. Diseña y desarrolla plataformas web, aplicaciones móviles, sistemas empresariales, APIs e integraciones a medida para startups y negocios en RD, Estados Unidos y LATAM.
+
+## Servicios
+- Desarrollo web y de software a medida, apps móviles, APIs e integraciones
+- Diseño UX/UI, identidad visual, landing pages y pitch decks
+- Infraestructura cloud, servidores, hosting, microservicios, mantenimiento y soporte
+
+## Páginas clave
+- [Servicios](https://www.teko.do/servicios): catálogo completo de servicios
+- [Planes y precios](https://www.teko.do/precios): planes y preguntas frecuentes
+- [Portafolio](https://www.teko.do/portafolio): proyectos entregados
+- [Plataformas](https://www.teko.do/plataformas): TEKO Social Manager y Rapidito
+- [Sobre TEKO](https://www.teko.do/nosotros): equipo y forma de trabajo
+- [Contacto](https://www.teko.do/contacto): cotizaciones y citas sin compromiso (info@teko.do, +1 849 246 4987)

@@ -6,6 +6,7 @@ import { Mail, MapPin, Clock, Send, CheckCircle2 } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import ApiErrorToast from "@/components/ui/api-error-toast";
+import { track } from "@/lib/track";
 import LazyVideo from "@/components/globales/lazy-video";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -119,6 +120,7 @@ export default function SectionContactoForm() {
       return;
     }
 
+    track("generate_lead", { service_id: form.service_id, budget_range_id: form.budget_range_id });
     setSent(true);
     setTimeout(() => setSent(false), 5000);
     setForm({

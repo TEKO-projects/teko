@@ -7,6 +7,9 @@ import SectionCasoRapidito from "@/components/home/section-caso-rapidito";
 import SectionPlataformas from "@/components/home/section-plataformas";
 import SectionAhorraTiempo from "@/components/home/section-ahorra-tiempo";
 import SectionNegociosReales from "@/components/home/section-negocios-reales";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default function Home() {
   return (
