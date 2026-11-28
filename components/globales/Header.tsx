@@ -78,7 +78,7 @@ export default function Header() {
 
           {/* Portal Cliente — desktop only */}
           <Link
-            href="/portal"
+            href="/en-construccion"
             className="hidden rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-200 hover:bg-white/[0.06] md:inline-flex"
             style={{
               marginLeft: "6px",
@@ -128,7 +128,7 @@ export default function Header() {
           }}
         >
           <nav className="flex flex-col gap-1">
-            {[...NAV_LINKS, { href: "/portal", label: "Portal Cliente" }].map(({ href, label }) => {
+            {[...NAV_LINKS, { href: "/en-construccion", label: "Portal Cliente" }].map(({ href, label }) => {
               const isActive = href === "/" ? pathname === "/" : pathname?.startsWith(href);
               return (
                 <Link

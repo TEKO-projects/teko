@@ -4,7 +4,7 @@ import { soluciones } from "@/Data/soluciones/soluciones-data";
 
 const faqs = [
   { q: "¿Qué hace TEKO?", a: "TEKO es una empresa de desarrollo de software en República Dominicana. Diseñamos y construimos páginas web, aplicaciones móviles, sistemas a medida, APIs y automatizaciones para startups y negocios en RD, Estados Unidos y Latinoamérica." },
-  { q: "¿Cómo puedo cotizar un proyecto con TEKO?", a: "Escribe desde la página de contacto, a info@teko.do o al +1 849 246 4987. Agendamos una cita sin compromiso para entender tu proyecto y te enviamos una propuesta." },
+  { q: "¿Cómo puedo cotizar un proyecto con TEKO?", a: "Escribe desde la página de contacto, a info@teko.do o por WhatsApp al +1 849 594 0040. Agendamos una cita sin compromiso para entender tu proyecto y te enviamos una propuesta." },
   { q: "¿Con qué tecnologías trabaja TEKO?", a: "React, Next.js, Node, Python, bases de datos relacionales e infraestructura en la nube como Vercel y AWS, además de Figma para el diseño." },
 ];
 

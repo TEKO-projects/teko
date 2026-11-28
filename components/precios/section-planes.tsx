@@ -15,7 +15,7 @@ if (!API_URL) {
 }
 
 const WS_LINK =
-  "https://wa.me/18092000000?text=Hola%2C%20me%20interesa%20cotizar%20un%20plan";
+  "https://wa.me/18495940040?text=Hola%2C%20me%20interesa%20cotizar%20un%20plan";
 
 type PlanFeature = {
   id: number;
@@ -23,7 +23,7 @@ type PlanFeature = {
   sort_order: number;
 };
 
-type Plan = {
+export type Plan = {
   id: number;
   name: string;
   slug: string;
@@ -60,9 +60,10 @@ function PlanSkeleton() {
   );
 }
 
-export default function SectionPlanes() {
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState(true);
+// initial: datos ya traídos en el servidor, para que buscadores e IA lean los planes en el HTML.
+export default function SectionPlanes({ initial }: { initial?: Plan[] | null }) {
+  const [plans, setPlans] = useState<Plan[]>(initial ?? []);
+  const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -82,8 +83,8 @@ export default function SectionPlanes() {
   }, []);
 
   useEffect(() => {
-    loadPlans();
-  }, [loadPlans]);
+    if (!initial) loadPlans();
+  }, [initial, loadPlans]);
 
   useEffect(() => {
     if (loading || plans.length === 0) return;

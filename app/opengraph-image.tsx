@@ -24,7 +24,7 @@ export default function Image() {
         <div style={{ marginTop: 28, fontSize: 32, color: "rgba(242,243,245,0.75)" }}>
           Webs, apps móviles, sistemas y APIs a medida · República Dominicana
         </div>
-        <div style={{ marginTop: 44, fontSize: 28, color: "#bfe9ff" }}>teko.do · +1 849 246 4987</div>
+        <div style={{ marginTop: 44, fontSize: 28, color: "#bfe9ff" }}>teko.do · WhatsApp +1 849 594 0040</div>
       </div>
     ),
     size,

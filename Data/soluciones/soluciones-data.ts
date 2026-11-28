@@ -38,7 +38,7 @@ export const soluciones: Solucion[] = [
       { q: "¿Qué es el desarrollo de software a medida?", a: "Es construir un sistema pensado para los procesos de tu negocio, en lugar de adaptar tu negocio a un programa genérico. Tú defines qué necesitas y el sistema hace exactamente eso." },
       { q: "¿Cuánto tarda un proyecto de software a medida?", a: "Depende del alcance. Un sistema sencillo puede estar listo en pocas semanas; uno con varios módulos y roles requiere más tiempo. Después de una reunión inicial te damos un plan por etapas y una estimación." },
       { q: "¿Trabajan con empresas fuera de Santo Domingo?", a: "Sí. Trabajamos de forma remota con clientes de toda República Dominicana, Estados Unidos y Latinoamérica." },
-      { q: "¿Cómo solicito una cotización?", a: "Escríbenos desde la página de contacto, a info@teko.do o al +1 849 246 4987. Agendamos una cita sin compromiso para entender tu proyecto." },
+      { q: "¿Cómo solicito una cotización?", a: "Escríbenos desde la página de contacto, a info@teko.do o por WhatsApp al +1 849 594 0040. Agendamos una cita sin compromiso para entender tu proyecto." },
     ],
   },
   {
@@ -122,7 +122,7 @@ export const soluciones: Solucion[] = [
       { q: "¿Qué puede hacer un chatbot de WhatsApp para mi negocio?", a: "Responder preguntas frecuentes, tomar pedidos o reservas, derivar a una persona cuando hace falta y atender fuera de horario." },
       { q: "¿Pueden conectar mi sistema actual con otras plataformas?", a: "En la mayoría de los casos sí, siempre que la plataforma ofrezca una API o forma de integración. Lo evaluamos contigo antes de comprometernos." },
       { q: "¿Qué pasa si algo falla en una automatización?", a: "Incluimos monitoreo y alertas para detectar y corregir fallos rápido, y ofrecemos soporte mensual." },
-      { q: "¿Cómo empiezo?", a: "Cuéntanos qué tarea repites todos los días y la convertimos en un flujo automático. Escríbenos a info@teko.do o al +1 849 246 4987." },
+      { q: "¿Cómo empiezo?", a: "Cuéntanos qué tarea repites todos los días y la convertimos en un flujo automático. Escríbenos a info@teko.do o por WhatsApp al +1 849 594 0040." },
     ],
   },
 ];

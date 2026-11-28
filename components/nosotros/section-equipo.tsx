@@ -121,7 +121,7 @@ export default function SectionEquipo() {
                     <FaLinkedinIn className="h-4 w-4" />
                   </a>
                   <a
-                    href="mailto:john.marte@unicaribe.edu.do"
+                    href="mailto:info@teko.do"
                     className="flex h-9 w-9 items-center justify-center rounded-full border transition-colors hover:border-[#1ec4ff] hover:text-[#1ec4ff]"
                     style={{ borderColor: "rgba(255,255,255,0.15)", color: "rgba(242,243,245,0.5)" }}
                     aria-label="Email"

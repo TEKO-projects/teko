@@ -78,8 +78,8 @@ export default async function SolucionPage({ params }: Props) {
           <Link href="/contacto" className="rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#080a0f] transition-colors hover:bg-[#e8ecf5]">
             Solicitar cotización
           </Link>
-          <a href="tel:+18492464987" className="rounded-full border px-6 py-3.5 text-sm font-semibold transition-colors hover:bg-white/5" style={{ borderColor: "rgba(255,255,255,0.18)" }}>
-            +1 849 246 4987
+          <a href="https://wa.me/18495940040" target="_blank" rel="noopener noreferrer" className="rounded-full border px-6 py-3.5 text-sm font-semibold transition-colors hover:bg-white/5" style={{ borderColor: "rgba(255,255,255,0.18)" }}>
+            WhatsApp +1 849 594 0040
           </a>
         </div>
 

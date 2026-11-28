@@ -14,7 +14,7 @@ if (!API_URL) {
   throw new Error("NEXT_PUBLIC_API_URL no está definida");
 }
 
-type FAQ = {
+export type FAQ = {
   id: number;
   question: string;
   answer: string;
@@ -42,9 +42,9 @@ function FaqSkeleton() {
   );
 }
 
-export default function SectionFAQ() {
-  const [faqs, setFaqs] = useState<FAQ[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function SectionFAQ({ initial }: { initial?: FAQ[] | null }) {
+  const [faqs, setFaqs] = useState<FAQ[]>(initial ?? []);
+  const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState(false);
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   const sectionRef = useRef<HTMLElement>(null);
@@ -65,8 +65,8 @@ export default function SectionFAQ() {
   }, []);
 
   useEffect(() => {
-    loadFaqs();
-  }, [loadFaqs]);
+    if (!initial) loadFaqs();
+  }, [initial, loadFaqs]);
 
   useEffect(() => {
     if (loading || faqs.length === 0) return;

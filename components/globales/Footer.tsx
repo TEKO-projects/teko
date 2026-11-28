@@ -37,7 +37,7 @@ const FOOTER_LINKS = [
     links: [
       { label: "Solicita una cotización", href: "/contacto" },
       { label: "info@teko.do", href: "mailto:info@teko.do" },
-      { label: "+1 849 246 4987", href: "tel:+18492464987" },
+      { label: "WhatsApp +1 849 594 0040", href: "https://wa.me/18495940040" },
     ],
   },
 ];

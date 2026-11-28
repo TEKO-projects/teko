@@ -14,7 +14,7 @@ const instrumentSerif = Instrument_Serif({ subsets: ["latin"], weight: "400", st
 
 export const metadata: Metadata = {
   title: {
-    default: "TEKO | Desarrollo de Software & Transformación Digital en RD",
+    default: "TEKO | Desarrollo de software en República Dominicana",
     template: "%s | TEKO",
   },
   description:
@@ -64,24 +64,24 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": ["Organization", "ProfessionalService"],
+      "@type": "Organization",
       "@id": "https://www.teko.do/#org",
       name: "TEKO",
-      url: "https://www.teko.do",
+      url: "https://www.teko.do/",
       logo: "https://www.teko.do/LogoTeko.png",
       email: "info@teko.do",
-      telephone: "+1-849-246-4987",
+      telephone: "+1-849-594-0040",
       address: { "@type": "PostalAddress", addressCountry: "DO" },
       founder: { "@type": "Person", name: "John Marte", jobTitle: "Founder & Tech Lead" },
-      contactPoint: { "@type": "ContactPoint", contactType: "sales", telephone: "+1-849-246-4987", email: "info@teko.do", availableLanguage: ["es", "en"] },
+      contactPoint: { "@type": "ContactPoint", contactType: "sales", telephone: "+1-849-594-0040", email: "info@teko.do", url: "https://wa.me/18495940040", areaServed: "DO", availableLanguage: ["es", "en"] },
       slogan: "Software que transforma negocios",
       description:
         "Agencia de desarrollo de software y transformación digital en República Dominicana: plataformas web, apps móviles, sistemas empresariales y APIs a medida.",
-      areaServed: ["DO", "US", "Latin America"],
+      areaServed: [{ "@type": "Country", name: "República Dominicana" }, { "@type": "Country", name: "Estados Unidos" }, { "@type": "Place", name: "Latinoamérica" }],
       knowsAbout: ["Desarrollo de software a medida", "Aplicaciones móviles", "Diseño UX/UI", "APIs e integraciones", "Cloud"],
       sameAs: ["https://www.instagram.com/teko.dr/"],
     },
-    { "@type": "WebSite", "@id": "https://www.teko.do/#web", url: "https://www.teko.do", name: "TEKO", inLanguage: "es-DO", publisher: { "@id": "https://www.teko.do/#org" } },
+    { "@type": "WebSite", "@id": "https://www.teko.do/#web", url: "https://www.teko.do/", name: "TEKO", inLanguage: "es-DO", publisher: { "@id": "https://www.teko.do/#org" } },
   ],
 };
 
@@ -92,7 +92,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="es"
+      lang="es-DO"
       suppressHydrationWarning
       className={cn("h-full ", "font-sans", geist.variable, instrumentSerif.variable)}
     >

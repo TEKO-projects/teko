@@ -14,9 +14,9 @@ if (!API_URL) {
   throw new Error("NEXT_PUBLIC_API_URL no está definida");
 }
 
-type PortfolioCategory = { id: number; name: string; slug: string };
+export type PortfolioCategory = { id: number; name: string; slug: string };
 
-type Project = {
+export type Project = {
   id: number;
   title: string;
   slug: string;
@@ -189,11 +189,12 @@ function ProjectSkeleton() {
   );
 }
 
-export default function SectionPortafolioGrid() {
+export default function SectionPortafolioGrid({ initialCategories, initialProjects }: { initialCategories?: PortfolioCategory[] | null; initialProjects?: Project[] | null }) {
+  const hasInitial = !!(initialCategories && initialProjects);
   const [filter, setFilter] = useState("Todos");
-  const [categories, setCategories] = useState<PortfolioCategory[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<PortfolioCategory[]>(initialCategories ?? []);
+  const [projects, setProjects] = useState<Project[]>(initialProjects ?? []);
+  const [loading, setLoading] = useState(!hasInitial);
   const [error, setError] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -223,7 +224,7 @@ export default function SectionPortafolioGrid() {
     }
   }, []);
 
-  useEffect(() => { loadPortfolio(); }, [loadPortfolio]);
+  useEffect(() => { if (!hasInitial) loadPortfolio(); }, [hasInitial, loadPortfolio]);
 
   useEffect(() => {
     if (loading || projects.length === 0 || prefersReducedMotion()) return;

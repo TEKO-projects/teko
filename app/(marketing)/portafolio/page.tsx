@@ -1,13 +1,11 @@
-"use client";
+import PortafolioView from "@/components/portafolio/portafolio-view";
+import type { PortfolioCategory, Project } from "@/components/portafolio/section-portafolio-grid";
+import { fetchBackend } from "@/components/globales/json-ld";
 
-import SectionPortafolioGrid from "@/components/portafolio/section-portafolio-grid";
-import PortafolioHero from "@/components/portafolio/portafolio-hero";
-
-export default function PortafolioPage() {
-  return (
-    <main style={{ background: "#080a0f" }}>
-      <PortafolioHero />
-      <SectionPortafolioGrid />
-    </main>
-  );
+export default async function PortafolioPage() {
+  const [categories, projects] = await Promise.all([
+    fetchBackend<PortfolioCategory[]>("/portfolio/categories"),
+    fetchBackend<Project[]>("/portfolio"),
+  ]);
+  return <PortafolioView categories={categories} projects={projects} />;
 }
